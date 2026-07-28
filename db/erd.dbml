@@ -1,0 +1,130 @@
+// =====================================================
+// 유휴 주차자원 정책 시뮬레이션 - 전체 스키마 (격자 기반)
+// 원천 + 분석결과 + 서비스 포함 (8개 테이블)
+// dbdiagram.io 에 붙여넣어 사용
+// 2026-07-26 데이터분석 최종 패키지(CSV 5종) 기준으로 갱신:
+//   - PARKING_IDLE 제외(유휴율 29.1%를 apartments.open_count에 사전 반영)
+//   - 위험지수 가중치 확정: (0.35공급부족+0.25수요압력+0.15교통혼잡+0.25환경민감도)×100
+//   - 격자 확정: 국가지점번호 100m×100m
+// =====================================================
+
+Table districts {
+  district_id   integer [pk, increment]
+  name          varchar [not null, note: '지역명 (예: 성남시 분당구)']
+  sido          varchar [note: '시도']
+  sigungu       varchar [note: '시군구']
+  center_lat    decimal [note: '지역 중심 위도']
+  center_lng    decimal [note: '지역 중심 경도']
+  vehicle_count integer [note: '차량등록 통계(통제 데이터)']
+  is_base       char(1) [default: 'N', note: 'Y=기준지역(분당구)']
+}
+
+Table grids {
+  grid_id            integer [pk, increment]
+  district_id        integer [not null, ref: > districts.district_id]
+  grid_code          varchar [note: '국가지점번호 (예: 다사515191) — 확정']
+  min_lat            decimal [note: '경계 남서 위도(bbox)']
+  min_lng            decimal [note: '경계 남서 경도']
+  max_lat            decimal [note: '경계 북동 위도']
+  max_lng            decimal [note: '경계 북동 경도']
+  center_lat         decimal [note: '격자 중심 위도(히트맵 라벨)']
+  center_lng         decimal [note: '격자 중심 경도']
+  area_km2           decimal [note: '격자 면적 0.01㎢ (100m×100m 확정)']
+  effective_area_km2 decimal [note: '녹지 제외 실질면적=단속밀도 분모(토지지목)']
+}
+
+Table apartments {
+  apartment_id  integer [pk, increment]
+  grid_id       integer [ref: > grids.grid_id, note: '공간조인 매핑 격자(NULL 허용)']
+  kapt_code     varchar [note: 'K-apt 원천 단지코드']
+  name          varchar [not null, note: '단지명']
+  address       varchar [note: '원주소(지오코딩 입력)']
+  lat           decimal [note: '지오코딩 결과 위도']
+  lng           decimal [note: '지오코딩 결과 경도']
+  total_parking integer [note: '총 주차면수']
+  is_open       char(1) [note: '외부인 개방 Y/N (최종 데이터 결측 없음: N=193, Y=17)']
+  open_count    integer [note: '개방 시 잠재 유휴면수 = 총면수×29.1% 사전 반영(시뮬레이션 기준값)']
+  source        varchar [default: '성남시 공공데이터']
+}
+
+Table enforcement {
+  enforcement_id integer [pk, increment]
+  grid_id        integer [ref: > grids.grid_id, note: '공간조인 격자(실패 시 NULL)']
+  place_text     varchar [note: '원본 단속 장소 텍스트(지오코딩 입력)']
+  lat            decimal [note: '지오코딩 결과 위도']
+  lng            decimal [note: '지오코딩 결과 경도']
+  enforced_at    date    [note: '단속 일자(2025, 시각 없음)']
+  day_of_week    varchar [note: '요일 한글. CSV는 "목요일" 형식 → 적재 시 "목" 한 글자로 통일(air_quality와 맞춤)']
+  geocode_status varchar [note: '성공/실패 (실패 471건 = grid_id NULL과 일치)']
+}
+// CSV의 day_type 컬럼("평일")은 전 행 동일값이라 적재 제외 (파일 자체가 평일만 필터됨, 161,231건)
+
+Table air_quality {
+  air_id       integer [pk, increment]
+  grid_id      integer [ref: > grids.grid_id, note: '측정소 소속 격자']
+  station_name varchar [note: '측정소명']
+  lat          decimal [note: '측정소 위도']
+  lng          decimal [note: '측정소 경도']
+  measured_at  datetime [note: '측정 시각(2025 연간 시간별, 측정소 4곳)']
+  month        integer [note: '월(1~12), measured_at에서 분해 제공']
+  day_of_week  varchar [note: '요일 한글 한 글자(예: 목)']
+  hour         integer [note: '시(0~23), 시간대 분석용']
+  no2          decimal [note: '이산화질소(NO2) — 배회·공회전 연관 지표']
+  co           decimal [note: '일산화탄소(CO) — 배회·공회전 연관 지표']
+}
+// pm10, pm25는 최종 데이터에서 제외됨(NO2·CO만 사용 — 분석 가이드 기준)
+
+// ---- PARKING_IDLE 테이블 제외 (2026-07-26 데이터분석 결정) ----
+// 유휴 비율 29.1%를 apartments.open_count에 사전 반영해 RISK_INDEX 산출 완료.
+// 1차 DB에서는 시간대별 유휴 테이블 불필요. 추후 시계열 정밀화 시 부활 후보.
+
+Table risk_index {
+  risk_id         integer [pk, increment]
+  grid_id         integer [not null, ref: > grids.grid_id]
+  hour_of_day     integer [not null, note: '0~23시']
+  demand_pressure decimal [note: '수요 압력 (가중치 0.25) — 단속밀도·시간대 수요']
+  supply_shortage decimal [note: '공급 부족 (가중치 0.35) — 유휴공급 대비 위험도']
+  traffic_congest decimal [note: '교통 혼잡 (가중치 0.15) — 시간대별 혼잡']
+  env_sensitivity decimal [note: '환경 민감도 (가중치 0.25) — NO2·CO 연동']
+  risk_score      decimal [note: '(0.35공급+0.25수요+0.15혼잡+0.25환경)×100. 분당 평균 baseline 37.81']
+  batch_date      date    [note: '분석 배치 적재일']
+
+  indexes {
+    (grid_id, hour_of_day) [unique]
+  }
+}
+
+// ---- 시나리오: 조건(레시피)만 보관. 조건 안 바뀌면 그대로 ----
+Table scenarios {
+  scenario_id      integer [pk, increment]
+  name             varchar [not null, note: '예: 분당구 평일 주간 10%']
+  memo             varchar [note: '선택']
+  district_id      integer [not null, ref: > districts.district_id]
+  open_to_public   char(1) [note: '외부인 개방 아파트 포함 Y/N ← 프론트 체크박스 openToPublic']
+  residents_only   char(1) [note: '입주민 전용 아파트 포함 Y/N ← 프론트 체크박스 residentsOnly (둘 다 Y 가능)']
+  participation    integer [note: '참여율 0~100 ← 프론트 participationRate']
+  operation_start  varchar [note: '운영 시작 "HH:mm" 문자열 ← 프론트 openFrom (예: 08:00)']
+  operation_end    varchar [note: '운영 종료 "HH:mm" 문자열 ← 프론트 openTo (예: 19:00)']
+  commercial_radius_m integer [note: '상업시설 반경(m) ← 프론트 commercialRadiusM, 기본 500']
+  parking_fee      integer [note: '부과 요금. 프론트 미전송(NULL 허용) — 시드/향후 확장용']
+  created_by       varchar [default: 'admin', note: '관리자 1명 상수']
+  created_at       timestamp
+  updated_at       timestamp [note: '조건을 실제로 수정했을 때만 갱신']
+}
+
+// ---- 시나리오 결과(요리): 갱신할 때마다 새 줄 INSERT (덮어쓰기 X) ----
+// 같은 scenario_id + 다른 run_date = "같은 조건, 다른 결과"
+Table scenario_results {
+  result_id        integer [pk, increment]
+  scenario_id      integer [not null, ref: > scenarios.scenario_id]
+  run_date         date    [not null, note: '이 결과가 어느 갱신분인지 ★']
+  added_supply     integer [note: '결과: 추가 확보 주차면']
+  risk_before      decimal [note: '결과: 적용 전 위험지수']
+  risk_after       decimal [note: '결과: 적용 후 위험지수']
+  carbon_reduction decimal [note: '결과: 탄소 저감량']
+  created_at       timestamp [note: '이 결과를 계산해 넣은 시각']
+
+  indexes {
+    (scenario_id, run_date) [unique]
+  }
+}

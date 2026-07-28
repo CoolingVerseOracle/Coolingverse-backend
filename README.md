@@ -139,6 +139,18 @@ DELETE /scenarios/{id}            삭제 (성공 204 / 없으면 404)
 - KPI 중 불법주정차/교통혼잡 감소율은 위험지수 감소율 기반 근사치입니다
   (전용 산식은 팀 협의 후 정밀화).
 
+## DB 스키마 (`db/` 폴더)
+
+| 파일 | 용도 |
+|---|---|
+| `db/schema.sql` | Oracle ADB용 DDL 전문 (8테이블, 2026-07-28 확정본) |
+| `db/seed.sql` | 초기 데이터 — 분당구 INSERT + 대표 개방률 5단계 시나리오/결과 |
+| `db/erd.dbml` | ERD 원본 (dbdiagram.io 에 붙여넣으면 다이어그램 렌더링) |
+
+실행 순서: ADB Database Actions → SQL에서 `schema.sql` 전체 실행 → `seed.sql` 실행 → CSV 5종 적재.
+데이터분석 인수인계 시드 SQL 원본은 구버전 컬럼(open_target 등)을 사용하므로,
+반드시 이 폴더의 `seed.sql`(프론트 정렬 스키마 기준 변환본)을 사용할 것. 결과 수치는 동일함.
+
 ## 프로젝트 구조
 
 ```

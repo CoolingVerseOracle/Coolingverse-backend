@@ -1,0 +1,47 @@
+-- =====================================================
+-- 초기 데이터 시드 (2026-07-28, 프론트 정렬 스키마 기준)
+-- 원본: 참고사항.txt의 시드 SQL을 새 scenarios 컬럼 구조로 변환
+--   - OPEN_TARGET 'EXTERNAL' → open_to_public='Y', residents_only='N'
+--   - OPERATION_START/END 8, 19 → '08:00', '19:00' (HH:mm 문자열)
+--   - commercial_radius_m 500 추가 (프론트 기본값)
+-- 실행 순서: DDL(schema-넓은버전.sql) 실행 후 이 파일 실행.
+-- CSV 적재와의 순서: districts INSERT가 가장 먼저여야 grids 적재가 가능.
+-- =====================================================
+
+-- 0. DISTRICTS — CSV가 없어서 수동 INSERT (grids의 district_id=1이 참조)
+INSERT INTO districts (district_id, name, sido, sigungu, center_lat, center_lng, is_base)
+VALUES (1, '성남시 분당구', '경기도', '성남시 분당구', 37.3595, 127.1052, 'Y');
+
+-- 1. SCENARIOS — 대표 개방률 5단계 (초기 화면용)
+INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
+VALUES (1, '1단계: 기초 개방안 (10%)', '출근 시간대(08~19시) 10% 추가 개방 시 시범 정책', 1, 'Y', 'N', 10, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);
+
+INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
+VALUES (2, '2단계: 표준 개방안 (30%)', '출근 시간대(08~19시) 30% 추가 개방 표준 정책', 1, 'Y', 'N', 30, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);
+
+INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
+VALUES (3, '3단계: 적극 개방안 (50%)', '출근 시간대(08~19시) 50% 추가 개방 적극 정책', 1, 'Y', 'N', 50, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);
+
+INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
+VALUES (4, '4단계: 전면 개방안 (70%)', '출근 시간대(08~19시) 70% 추가 개방 공공 주도 정책', 1, 'Y', 'N', 70, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);
+
+INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
+VALUES (5, '5단계: 최대 상한안 (100%)', '출근 시간대(08~19시) 유휴 주차면 100% 완전 개방', 1, 'Y', 'N', 100, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);
+
+-- 2. SCENARIO_RESULTS — 사전 계산된 초기 결과 (참고사항.txt 값 그대로)
+INSERT INTO scenario_results (result_id, scenario_id, run_date, added_supply, risk_before, risk_after, carbon_reduction, created_at)
+VALUES (1, 1, TRUNC(SYSDATE), 3911, 37.81, 37.45, 1436.12, SYSDATE);
+
+INSERT INTO scenario_results (result_id, scenario_id, run_date, added_supply, risk_before, risk_after, carbon_reduction, created_at)
+VALUES (2, 2, TRUNC(SYSDATE), 11734, 37.81, 36.85, 4308.72, SYSDATE);
+
+INSERT INTO scenario_results (result_id, scenario_id, run_date, added_supply, risk_before, risk_after, carbon_reduction, created_at)
+VALUES (3, 3, TRUNC(SYSDATE), 19557, 37.81, 36.50, 7181.33, SYSDATE);
+
+INSERT INTO scenario_results (result_id, scenario_id, run_date, added_supply, risk_before, risk_after, carbon_reduction, created_at)
+VALUES (4, 4, TRUNC(SYSDATE), 27379, 37.81, 36.29, 10053.57, SYSDATE);
+
+INSERT INTO scenario_results (result_id, scenario_id, run_date, added_supply, risk_before, risk_after, carbon_reduction, created_at)
+VALUES (5, 5, TRUNC(SYSDATE), 39114, 37.81, 36.13, 14362.66, SYSDATE);
+
+COMMIT;
