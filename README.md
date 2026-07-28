@@ -151,6 +151,24 @@ DELETE /scenarios/{id}            삭제 (성공 204 / 없으면 404)
 데이터분석 인수인계 시드 SQL 원본은 구버전 컬럼(open_target 등)을 사용하므로,
 반드시 이 폴더의 `seed.sql`(프론트 정렬 스키마 기준 변환본)을 사용할 것. 결과 수치는 동일함.
 
+## 테스트
+
+```bash
+./gradlew test
+```
+
+시뮬레이션 수식이 분석 가이드의 시나리오 표(5단계 × 공급/CO2/위험지수)를 그대로
+재현하는지 자동 검증합니다. 코드를 수정한 뒤에는 반드시 이 명령으로 확인하세요.
+
+## DB 연동 준비 상태 (JPA)
+
+- 기본 실행 = **H2 메모리 DB** (로컬 개발용, 재시작하면 비워짐). 엔티티 매핑 검증용.
+- Oracle ADB 연결 시 = `--spring.profiles.active=oracle` 로 전환.
+  `application-oracle.properties`에 Wallet 경로·계정을 환경변수로 채우면 됨.
+- `src/main/java/com/example/demo/db/`에 ERD 8테이블과 1:1인 엔티티 +
+  리포지토리(시뮬레이션 상수를 실측 쿼리로 교체할 집계 쿼리 포함)가 준비되어 있음.
+- 아직 API는 메모리 저장소(ScenarioStore)를 사용 중 — ADB 데이터 적재 후 교체 예정.
+
 ## 프로젝트 구조
 
 ```
