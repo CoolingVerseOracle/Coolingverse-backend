@@ -49,8 +49,12 @@ public class SimulationService {
     private static final double[] ANCHOR_RATE  = {0, 10, 30, 50, 70, 100};
     private static final double[] ANCHOR_DELTA = {0, 0.36, 0.96, 1.31, 1.52, 1.68};
 
-    /** 시뮬레이션 실행 — 프론트 SimulationResult 모양으로 반환 */
-    public SimulationResult simulate(SimulationSettings s) {
+    /** 핵심 계산 결과 묶음 — 시뮬레이션 응답과 시나리오 저장 스냅샷이 공유한다 */
+    public record CoreNumbers(int addedSupply, int totalSupply, double co2Kg,
+                              double riskBefore, double riskAfter, double deltaPct) {}
+
+    /** 핵심 수식 계산 (공급·CO2·위험지수) — 시나리오 저장 시에도 이 메서드를 쓴다 */
+    public CoreNumbers core(SimulationSettings s) {
         int p = clamp(s.participationRate(), 0, 100);
 
         // 1) 추가 공급: 미개방 단지 유휴면 × 참여율 (입주민 전용을 포함해야 발생)
@@ -70,18 +74,26 @@ public class SimulationService {
         double delta = s.residentsOnly() ? interpolateDelta(p) : 0;
         double riskAfter = round2(RISK_BASELINE - delta);
 
-        // 5) 공급률(%): 개방 유휴면 / 전체 주차면
-        double supplyRateBefore = round1(100.0 * base / TOTAL_PARKING);
-        double supplyRateAfter = round1(100.0 * totalSupply / TOTAL_PARKING);
-
-        // 위험지수 감소율(%) — 아래 근사 지표들의 재료
+        // 위험지수 감소율(%) — 근사 지표들의 재료
         double deltaPct = round1(100.0 * delta / RISK_BASELINE);
 
+        return new CoreNumbers(added, totalSupply, co2Kg, RISK_BASELINE, riskAfter, deltaPct);
+    }
+
+    /** 시뮬레이션 실행 — 프론트 SimulationResult 모양으로 반환 */
+    public SimulationResult simulate(SimulationSettings s) {
+        int p = clamp(s.participationRate(), 0, 100);
+        CoreNumbers c = core(s);
+
+        // 공급률(%): 개방 유휴면 / 전체 주차면
+        double supplyRateBefore = round1(100.0 * (s.openToPublic() ? IDLE_OPENED_TOTAL : 0) / TOTAL_PARKING);
+        double supplyRateAfter = round1(100.0 * c.totalSupply() / TOTAL_PARKING);
+
         return new SimulationResult(
-                buildKpis(totalSupply, added, co2Kg, riskAfter, deltaPct),
-                buildMetricChanges(riskAfter, deltaPct, supplyRateBefore, supplyRateAfter),
+                buildKpis(c.totalSupply(), c.addedSupply(), c.co2Kg(), c.riskAfter(), c.deltaPct()),
+                buildMetricChanges(c.riskAfter(), c.deltaPct(), supplyRateBefore, supplyRateAfter),
                 buildParticipation(p),
-                buildHourlySupply(s, totalSupply),
+                buildHourlySupply(s, c.totalSupply()),
                 buildRiskTrend());
     }
 
