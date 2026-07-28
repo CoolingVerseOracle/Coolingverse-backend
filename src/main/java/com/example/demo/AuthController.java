@@ -39,6 +39,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody LoginRequest req) {
+        // 필드 누락/공백 방어: 이대로 BCrypt 비교에 들어가면 500 에러가 나므로 먼저 거른다
+        if (req == null || isBlank(req.username()) || isBlank(req.password())) {
+            return Map.of("success", false, "message", "아이디와 비밀번호를 모두 입력해 주세요.");
+        }
         try {
             // 환경변수로 등록된 관리자 계정을 꺼내서
             UserDetails admin = userDetailsService.loadUserByUsername(req.username());
@@ -50,5 +54,9 @@ public class AuthController {
             // 아이디가 틀린 경우 — 아래 공통 실패 응답으로 (아이디/비번 중 뭐가 틀렸는지 숨김)
         }
         return Map.of("success", false, "message", "계정 또는 비밀번호를 확인해 주세요.");
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }

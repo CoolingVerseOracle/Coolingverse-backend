@@ -3,6 +3,7 @@ package com.example.demo;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -75,9 +76,14 @@ public class ScenarioController {
     }
 
     @PostMapping("/scenarios")
-    public ScenarioDetail create(@RequestBody CreateScenarioRequest req) {
+    public ResponseEntity<?> create(@RequestBody CreateScenarioRequest req) {
+        // 필수값 방어: 이름/설정 없이 저장하면 NPE 500이 나므로 400으로 안내
+        if (req == null || req.name() == null || req.name().isBlank() || req.settings() == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "시나리오 이름과 설정값은 필수입니다."));
+        }
         ScenarioEntity saved = store.save(req.name(), req.memo(), req.settings());
-        return toDetail(saved);
+        return ResponseEntity.ok(toDetail(saved));
     }
 
     @GetMapping("/scenarios/{id}")

@@ -94,6 +94,21 @@ class SimulationServiceTest {
     }
 
     @Test
+    @DisplayName("자정을 넘긴 운영시간(22:00~06:00)도 음수 없이 계산된다")
+    void handlesOvernightWindow() {
+        SimulationSettings overnight =
+                new SimulationSettings(true, true, 50, "22:00", "06:00", 500);
+
+        // 22~06시 = 9시간 블록: 19557 × 0.306 × (9/10) = 5385.9978 → 5386.00
+        assertEquals(5386.00, service.core(overnight).co2Kg(), 0.001);
+
+        var result = service.simulate(overnight);
+        assertEquals(9, result.hourlySupply().size());
+        assertEquals("22시", result.hourlySupply().get(0).label());
+        assertEquals("06시", result.hourlySupply().get(8).label());
+    }
+
+    @Test
     @DisplayName("참여율은 0~100으로 잘린다 (150 입력 = 100 취급)")
     void participationIsClamped() {
         CoreNumbers over = service.core(settings(150));

@@ -65,7 +65,8 @@ public class SimulationService {
 
         // 2) 운영시간: 시작·종료 시각 블록을 모두 세는 방식 (08:00~19:00 = 12시간)
         //    — 분석 가이드의 시나리오 표 수치(예: 10%→1,436.12kg)와 일치하도록 맞춤
-        double hours = (toMinutes(s.openTo()) - toMinutes(s.openFrom())) / 60.0 + 1;
+        //    자정을 넘기는 설정(예: 22:00~06:00)도 음수가 되지 않게 하루 단위로 감아서 계산
+        double hours = Math.floorMod(toMinutes(s.openTo()) - toMinutes(s.openFrom()), 24 * 60) / 60.0 + 1;
 
         // 3) 일일 CO2 저감량(kg) = 추가 개방 면수 × 0.306 × (운영시간 / 10)
         double co2Kg = round2(added * CO2_PER_SPACE_KG * (hours / 10.0));
@@ -146,10 +147,10 @@ public class SimulationService {
      */
     private List<ChartPoint> buildHourlySupply(SimulationSettings s, int totalSupply) {
         int from = toMinutes(s.openFrom()) / 60;
-        int to = toMinutes(s.openTo()) / 60;
+        int blocks = Math.floorMod(toMinutes(s.openTo()) / 60 - from, 24) + 1; // 자정 넘김도 안전
         List<ChartPoint> points = new ArrayList<>();
-        for (int h = from; h <= to; h++) {
-            points.add(new ChartPoint(String.format("%02d시", h), totalSupply));
+        for (int i = 0; i < blocks; i++) {
+            points.add(new ChartPoint(String.format("%02d시", (from + i) % 24), totalSupply));
         }
         return points;
     }
