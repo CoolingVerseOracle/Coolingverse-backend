@@ -54,7 +54,7 @@ CREATE TABLE apartments (
   grid_id       NUMBER,                           -- 공간조인 매핑 격자(NULL 허용)
   kapt_code     VARCHAR2(50),                     -- K-apt 원천 단지코드
   name          VARCHAR2(150) NOT NULL,           -- 단지명
-  address       VARCHAR2(300),                    -- 원주소(지오코딩 입력)
+  address       VARCHAR2(600),                    -- 원주소(지오코딩 입력). 다중 번지 단지 존재(수내동 7개 번지 합본)로 600 필요
   lat           NUMBER(10,7),                     -- 지오코딩 결과 위도
   lng           NUMBER(10,7),                     -- 지오코딩 결과 경도
   total_parking NUMBER,                           -- 총 주차면수
