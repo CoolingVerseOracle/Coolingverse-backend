@@ -48,15 +48,19 @@ public class ScenarioController {
     public Paginated<ScenarioRow> list(
             @RequestParam(defaultValue = "all") String region,
             @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "all") String participation,
+            @RequestParam(defaultValue = "all") String timeSlot,
             @RequestParam(defaultValue = "updatedDesc") String sort,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize) {
 
-        // 1) 필터: 지역, 이름 검색어
+        // 1) 필터: 지역, 이름 검색어, 참여율, 시간대 (프론트 ScenarioFilter와 1:1)
         List<ScenarioEntity> filtered = store.findAll().stream()
                 .filter(e -> region.equals("all") || e.region.equals(region))
                 .filter(e -> keyword.isBlank()
                         || e.name.toLowerCase().contains(keyword.trim().toLowerCase()))
+                .filter(e -> matchesParticipation(e, participation))
+                .filter(e -> matchesTimeSlot(e, timeSlot))
                 .toList();
 
         // 2) 정렬: 수정일 최신순/오래된순
@@ -100,6 +104,50 @@ public class ScenarioController {
         return store.deleteById(id)
                 ? ResponseEntity.noContent().build()   // 204: 지웠음
                 : ResponseEntity.notFound().build();   // 404: 그런 시나리오 없음
+    }
+
+    // ── 필터 도우미 ───────────────────────────────────────────────────
+
+    /** 참여율 필터 (프론트 드롭다운 값): lt10 = 10% 미만, gte10 = 10% 이상 */
+    private boolean matchesParticipation(ScenarioEntity e, String filter) {
+        int rate = e.settings.participationRate();
+        return switch (filter) {
+            case "lt10" -> rate < 10;
+            case "gte10" -> rate >= 10;
+            default -> true;  // "all" 또는 알 수 없는 값 → 필터 없음
+        };
+    }
+
+    /**
+     * 시간대 필터 (프론트 드롭다운 값): day = 주간(09~18시), night = 야간(18~23시).
+     * 운영시간이 해당 구간과 한 시간이라도 "겹치면" 매칭으로 판정한다
+     * (예: 08~19시 운영은 주간·야간 양쪽에 해당). 자정 넘김 운영도 안전.
+     */
+    private boolean matchesTimeSlot(ScenarioEntity e, String filter) {
+        return switch (filter) {
+            case "day" -> operatesWithin(e, 9, 18);
+            case "night" -> operatesWithin(e, 18, 23);
+            default -> true;
+        };
+    }
+
+    /** 운영시간 블록 중 하나라도 [fromHour, toHour) 구간에 들어가면 true */
+    private boolean operatesWithin(ScenarioEntity e, int fromHour, int toHour) {
+        int start = hourOf(e.settings.openFrom());
+        int blocks = Math.floorMod(hourOf(e.settings.openTo()) - start, 24) + 1;
+        for (int i = 0; i < blocks; i++) {
+            int hour = (start + i) % 24;
+            if (hour >= fromHour && hour < toHour) return true;
+        }
+        return false;
+    }
+
+    private int hourOf(String hhmm) {
+        try {
+            return Integer.parseInt(hhmm.split(":")[0]);
+        } catch (Exception ex) {
+            return 0;
+        }
     }
 
     // ── 변환 도우미 ───────────────────────────────────────────────────
