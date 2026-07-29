@@ -50,7 +50,11 @@ API 명세와 프론트 연동법은 `README.md`, 진행 이력은 `docs/PROGRES
    넣지 않는다. 접속 정보는 환경변수로만 주입한다.
 5. **시드 데이터와 IDENTITY의 관계를 기억하라.** `db/seed.sql`은 번호를 수동 지정한 뒤
    `START WITH LIMIT VALUE`로 자동 번호를 재정렬한다. 시드를 수정하면 이 재정렬도 함께 챙길 것.
-6. **커밋 메시지는 한글로, AI 공동작성자 트레일러(Co-Authored-By)는 붙이지 않는다.**
+6. **커밋·PR은 팀 컨벤션을 따른다** (프론트 레포 `docs/commit-and-pr-convention.md`와 동일):
+   - 커밋/PR 제목: `Type(Scope) : 한국어 설명` (예: `Feat(scenario) : 시나리오 검색 필터 추가`)
+   - **main 직접 push 금지** — 모든 변경은 작업 브랜치(`type/설명`) → PR → 병합
+   - PR 본문: 요약 / 변경사항 / 테스트 계획 3단 구성, 서명·attribution 문구 금지
+   - AI 공동작성자 트레일러(Co-Authored-By)는 붙이지 않는다
 
 ## 도메인 지식 (자주 헷갈리는 것)
 
