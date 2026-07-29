@@ -26,20 +26,25 @@ import com.example.demo.SimulationDtos.SimulationSettings;
 @Service
 public class SimulationService {
 
-    // ── 집계 상수 (출처: CSV 실측 + 분석 가이드) ─────────────────────────
-    /** 미개방(is_open='N') 193개 단지의 잠재 유휴면 합계 = 슬라이더 100% 시 추가 공급 */
-    private static final int IDLE_UNOPENED_TOTAL = 39_114;
-    /** 기개방(is_open='Y') 17개 단지의 유휴면 합계 = 이미 활용 가능한 기본 공급 */
-    private static final int IDLE_OPENED_TOTAL = 3_684;
-    /** 전체 210개 단지 주차면 합계 (공급률 분모) */
-    private static final int TOTAL_PARKING = 147_580;
-    /** 단지 수 */
-    private static final int APT_OPENED = 17, APT_UNOPENED = 193, APT_TOTAL = 210;
+    // ── 집계값: DB 실측(oracle) 또는 검증된 기본값(로컬 H2) — StatsConfig가 결정 ──
+    private final int IDLE_UNOPENED_TOTAL;  // 미개방 단지 잠재 유휴면 합 = 100% 시 추가 공급
+    private final int IDLE_OPENED_TOTAL;    // 기개방 단지 유휴면 합 = 기본 공급
+    private final int TOTAL_PARKING;        // 전체 주차면 합 (공급률 분모)
+    private final int APT_OPENED, APT_UNOPENED, APT_TOTAL;  // 단지 수
+    private final double RISK_BASELINE;     // 위험지수 baseline (24시간 전체 평균)
 
-    /** 분당구 전체 평균 위험지수 (개방 전 baseline) */
-    private static final double RISK_BASELINE = 37.81;
-    /** 주차면 1면 개방 시 일일 CO2 저감 계수(kg) — 배회 1.5km + 공회전 4분 */
+    /** 주차면 1면 개방 시 일일 CO2 저감 계수(kg) — 배회 1.5km + 공회전 4분 (분석 확정 상수) */
     private static final double CO2_PER_SPACE_KG = 0.306;
+
+    public SimulationService(SupplyStats stats) {
+        this.IDLE_UNOPENED_TOTAL = stats.idleUnopened();
+        this.IDLE_OPENED_TOTAL = stats.idleOpened();
+        this.TOTAL_PARKING = stats.totalParking();
+        this.APT_OPENED = stats.aptOpened();
+        this.APT_UNOPENED = stats.aptUnopened();
+        this.APT_TOTAL = stats.aptOpened() + stats.aptUnopened();
+        this.RISK_BASELINE = stats.riskBaseline();
+    }
 
     /**
      * 위험지수 감소폭 앵커 (분석 가이드 시나리오 표).

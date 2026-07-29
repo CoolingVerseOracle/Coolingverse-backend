@@ -20,7 +20,8 @@ import com.example.demo.SimulationService.CoreNumbers;
  */
 class SimulationServiceTest {
 
-    private final SimulationService service = new SimulationService();
+    // 검증된 기본값(=CSV 실측=DB 실측)으로 계산기 생성 — DB 없이 수식만 검증
+    private final SimulationService service = new SimulationService(SupplyStats.VERIFIED_DEFAULTS);
 
     /** 표준 설정(08~19시, 외부인+입주민 포함)으로 참여율만 바꾼 설정 생성 */
     private SimulationSettings settings(int rate) {

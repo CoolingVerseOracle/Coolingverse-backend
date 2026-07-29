@@ -5,37 +5,41 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import com.example.demo.SimulationDtos.SimulationSettings;
 import com.example.demo.ScenarioStore.ScenarioEntity;
 
 /**
- * 시나리오 임시 저장소 테스트.
- * 시드 5건 생성, 저장 시 결과 스냅샷 계산, 삭제 동작을 확인한다.
+ * 시나리오 저장소(JPA 기반) 테스트 — 로컬 H2 DB로 실행.
+ * 시드 생성, 저장 시 결과 스냅샷 계산, 삭제 동작을 확인한다.
+ * 다른 테스트와 DB를 공유할 수 있어 개수 검증은 상대값으로 한다.
  */
+@SpringBootTest
 class ScenarioStoreTest {
 
+    @Autowired
     private ScenarioStore store;
 
-    @BeforeEach
-    void setUp() {
-        store = new ScenarioStore(new SimulationService());
-    }
-
     @Test
-    @DisplayName("기동 시 대표 개방률 5단계 시드가 생성된다")
+    @DisplayName("기동 시 대표 개방률 5단계 시드가 생성된다 (10~100% 전부 존재)")
     void seedsFiveDefaults() {
-        assertEquals(5, store.findAll().size());
+        var all = store.findAll();
+        assertTrue(all.size() >= 5);
+        for (int rate : new int[] {10, 30, 50, 70, 100}) {
+            assertTrue(all.stream().anyMatch(e -> e.settings.participationRate() == rate),
+                    rate + "% 시드가 없음");
+        }
     }
 
     @Test
     @DisplayName("시드 스냅샷이 분석 가이드 표와 일치 (30% = 공급 11,734 / 위험 36.85 / CO2 4,308.72)")
     void seedSnapshotsMatchAnalysisGuide() {
         ScenarioEntity standard = store.findAll().stream()
-                .filter(e -> e.settings.participationRate() == 30)
+                .filter(e -> e.name.contains("표준"))
                 .findFirst().orElseThrow();
 
         assertEquals(11734, standard.addedSupply);
@@ -45,8 +49,9 @@ class ScenarioStoreTest {
     }
 
     @Test
-    @DisplayName("저장하면 결과 스냅샷이 즉석 계산되어 함께 보관된다")
+    @DisplayName("저장하면 결과 스냅샷이 즉석 계산되어 DB에 함께 보관된다")
     void saveComputesSnapshot() {
+        int before = store.findAll().size();
         SimulationSettings settings =
                 new SimulationSettings(true, true, 45, "09:00", "18:00", 500);
 
@@ -55,7 +60,9 @@ class ScenarioStoreTest {
         assertEquals(17601, saved.addedSupply);          // floor(39114 × 0.45)
         assertEquals(36.59, saved.riskAfter, 0.001);     // 선형 보간
         assertEquals(5385.91, saved.carbonReduction, 0.001); // 10시간 블록
-        assertEquals(6, store.findAll().size());         // 시드 5 + 새 저장 1
+        assertEquals(before + 1, store.findAll().size());
+
+        store.deleteById(saved.id);                       // 뒷정리
     }
 
     @Test
