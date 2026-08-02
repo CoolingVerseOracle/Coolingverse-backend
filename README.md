@@ -10,6 +10,9 @@ Spring Boot(Java 17) 기반이며, 프론트엔드(Vue) 프로토타입의 타�
 ```
 
 - 기본 포트: **8080**
+- **모든 API는 `/api` 접두사를 가진다** (예: `POST http://localhost:8080/api/login`).
+  팀 합의(2026-08-02)에 따라 배포 시 nginx가 `/api`를 떼지 않고 그대로 전달하므로,
+  백엔드가 접두사를 직접 처리한다.
 - CORS: `http://localhost:5173` (Vite 개발서버) 허용됨
 - 관리자 계정: 환경변수 `ADMIN_ID`, `ADMIN_PASSWORD_HASH`(BCrypt)로 주입.
   로컬 테스트용 기본값이 있어 환경변수 없이도 바로 실행됩니다.
@@ -26,11 +29,14 @@ Spring Boot(Java 17) 기반이며, 프론트엔드(Vue) 프로토타입의 타�
 
 ### 프론트 연동 설정
 
-프론트 저장소의 `.env` 파일에:
+프론트 저장소의 `.env` 파일에 (접두사 `/api` 포함):
 
 ```
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=http://localhost:8080/api
 ```
+
+배포 환경에서는 `.env.production`의 `VITE_API_BASE_URL=/api`가 적용되고,
+nginx가 `/api` 경로를 접두사째로 백엔드에 전달한다.
 
 `src/api/*.ts`의 목(mock) 함수를 주석에 적힌 대로 `http()` 호출로 교체하면 됩니다.
 로그인 응답의 `token`은 이미 `stores/auth.ts`가 `setAuthToken()`으로 처리하게 되어 있습니다.
