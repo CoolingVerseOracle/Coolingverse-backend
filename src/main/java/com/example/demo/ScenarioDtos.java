@@ -39,6 +39,15 @@ public class ScenarioDtos {
             SimulationSettings settings
     ) {}
 
+    /**
+     * 메타데이터 부분 수정 요청 (PATCH) — 이름·메모만 대상.
+     * 보내지 않은 필드(null)는 기존 값을 유지한다. 설정값·결과 스냅샷은 수정 대상이 아니다.
+     */
+    public record UpdateScenarioRequest(
+            String name,
+            String memo
+    ) {}
+
     /** 상세 조회 응답: 조건(설정)과 결과 스냅샷을 모두 담는다 — "열기" 버튼용 */
     public record ScenarioDetail(
             String id,

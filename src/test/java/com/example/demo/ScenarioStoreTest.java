@@ -66,6 +66,21 @@ class ScenarioStoreTest {
     }
 
     @Test
+    @DisplayName("메타데이터 수정 시 updatedAt이 실제로 갱신된다 (응답 표시는 분 단위라 육안 확인 불가)")
+    void updateMetadataTouchesUpdatedAt() {
+        ScenarioEntity saved = store.save("수정 전", "메모",
+                new SimulationSettings(true, true, 30, "08:00", "19:00", 500));
+
+        ScenarioEntity updated = store.updateMetadata(saved.id, "수정 후", null);
+
+        assertTrue(updated.updatedAt.isAfter(saved.createdAt),
+                "updatedAt(" + updated.updatedAt + ")이 createdAt(" + saved.createdAt + ") 이후여야 함");
+        assertEquals("메모", updated.memo);  // 안 보낸 필드는 유지
+
+        store.deleteById(saved.id);
+    }
+
+    @Test
     @DisplayName("삭제하면 사라지고, 없는 id 삭제는 false")
     void deleteRemovesEntity() {
         ScenarioEntity saved = store.save("지울 것", null,

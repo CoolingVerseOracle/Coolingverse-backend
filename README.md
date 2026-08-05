@@ -95,6 +95,7 @@ POST 요청 (프론트 `SimulationSettings` 타입 그대로):
 GET    /scenarios                 목록 (검색·정렬·페이지네이션)
 POST   /scenarios                 저장
 GET    /scenarios/{id}            상세 (열기)
+PATCH  /scenarios/{id}            이름·메모 부분 수정
 DELETE /scenarios/{id}            삭제 (성공 204 / 없으면 404)
 ```
 
@@ -132,6 +133,14 @@ DELETE /scenarios/{id}            삭제 (성공 204 / 없으면 404)
                 "openFrom": "09:00", "openTo": "18:00", "commercialRadiusM": 500 }
 }
 ```
+
+수정 요청 — 이름·메모만 대상이며, **보내지 않은 필드는 기존 값을 유지**합니다.
+설정값과 결과 스냅샷은 불변이라 재계산이 일어나지 않습니다:
+```json
+{ "name": "새 이름", "memo": "새 메모" }
+```
+`name`과 `memo`를 모두 생략하거나 `name`을 빈 문자열로 보내면 400,
+없는 id면 404를 반환합니다.
 
 ---
 

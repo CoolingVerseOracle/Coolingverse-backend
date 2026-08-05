@@ -103,6 +103,20 @@ public class ScenarioStore {
                 core.addedSupply(), core.riskBefore(), core.riskAfter(), core.co2Kg()));
     }
 
+    /**
+     * 메타데이터(이름·메모)만 수정. 없는 id면 null 반환.
+     * 설정값과 결과 스냅샷은 건드리지 않으므로 재계산이 일어나지 않는다.
+     */
+    @Transactional
+    public ScenarioEntity updateMetadata(long id, String name, String memo) {
+        return scenarios.findById(id)
+                .map(entity -> {
+                    entity.updateMetadata(name, memo);
+                    return toView(scenarios.save(entity), latestResult(entity.getScenarioId()));
+                })
+                .orElse(null);
+    }
+
     public List<ScenarioEntity> findAll() {
         return scenarios.findAll().stream()
                 .map(e -> toView(e, latestResult(e.getScenarioId())))
