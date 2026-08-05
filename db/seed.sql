@@ -12,6 +12,10 @@
 INSERT INTO districts (district_id, name, sido, sigungu, center_lat, center_lng, is_base)
 VALUES (1, '성남시 분당구', '경기도', '성남시 분당구', 37.3595, 127.1052, 'Y');
 
+-- 비교 지역: 수원 인계동 (이슈 #22 — 시나리오 지역 저장용. 격자·지수 데이터는 분석팀 확보 대기)
+INSERT INTO districts (district_id, name, sido, sigungu, center_lat, center_lng, is_base)
+VALUES (2, '수원 인계동', '경기도', '수원시 팔달구', 37.2635, 127.0302, 'N');
+
 -- 1. SCENARIOS — 대표 개방률 5단계 (초기 화면용)
 INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
 VALUES (1, '1단계: 기초 개방안 (10%)', '출근 시간대(08~19시) 10% 추가 개방 시 시범 정책', 1, 'Y', 'N', 10, '08:00', '19:00', 500, 1000, 'admin', SYSDATE);

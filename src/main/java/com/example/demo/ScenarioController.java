@@ -57,8 +57,10 @@ public class ScenarioController {
             @RequestParam(defaultValue = "10") int pageSize) {
 
         // 1) 필터: 지역, 이름 검색어, 참여율, 시간대 (프론트 ScenarioFilter와 1:1)
+        // 지역은 코드("pangyo")를 표준으로 받되, 표시명도 허용 (이슈 #22 — 구버전 호환)
         List<ScenarioEntity> filtered = store.findAll().stream()
-                .filter(e -> region.equals("all") || e.region.equals(region))
+                .filter(e -> region.equals("all")
+                        || Regions.fromCode(e.settings.region()).matchesFilter(region))
                 .filter(e -> keyword.isBlank()
                         || e.name.toLowerCase().contains(keyword.trim().toLowerCase()))
                 .filter(e -> matchesParticipation(e, participation))
@@ -176,12 +178,13 @@ public class ScenarioController {
 
     // ── 변환 도우미 ───────────────────────────────────────────────────
 
-    /** 목록 행: 조건 요약(예: "30%, 08~19시")을 만들어 프론트 테이블 모양으로 */
+    /** 목록 행: participationRate가 표준, conditions는 프론트 전환기 동안만 유지 (이슈 #22) */
     private ScenarioRow toRow(ScenarioEntity e) {
         String conditions = e.settings.participationRate() + "%, "
                 + e.settings.openFrom().substring(0, 2) + "~"
                 + e.settings.openTo().substring(0, 2) + "시";
         return new ScenarioRow(String.valueOf(e.id), e.name, e.region, conditions,
+                e.settings.participationRate(),
                 e.addedSupply, e.riskBefore, e.riskAfter, e.updatedAt.format(DOT_DATE));
     }
 

@@ -17,8 +17,17 @@ public class SimulationDtos {
             int participationRate,     // 참여율 0~100 (%)
             String openFrom,           // 운영 시작 "HH:mm"
             String openTo,             // 운영 종료 "HH:mm"
-            int commercialRadiusM      // 상업시설 반경(m)
-    ) {}
+            int commercialRadiusM,     // 상업시설 반경(m)
+            String region,             // "pangyo" | "ingye" — null이면 pangyo 취급 (이슈 #22)
+            Integer month              // 1~12, null 허용 — 수신만 하고 저장하지 않음 (계산 미사용, 이슈 #22 결정)
+    ) {
+        /** 지역·월 없이 만드는 기존 호출용 축약 생성자 (기본 지역 pangyo) */
+        public SimulationSettings(boolean openToPublic, boolean residentsOnly, int participationRate,
+                                  String openFrom, String openTo, int commercialRadiusM) {
+            this(openToPublic, residentsOnly, participationRate, openFrom, openTo,
+                    commercialRadiusM, "pangyo", null);
+        }
+    }
 
     /** 대시보드 KPI 카드 1장 (프론트 KpiMetric) */
     public record KpiMetric(
