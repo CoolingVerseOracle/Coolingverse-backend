@@ -14,7 +14,8 @@ public class GridRiskDtos {
     public record GridRiskPoint(
             double lat,
             double lng,
-            double riskScore    // 0~100
+            double riskScore,           // 현재 위험지수 (0~100)
+            double projectedRiskScore   // 참여율 적용 후 (이슈 #19 — 초기 버전: 전 격자 동일 감쇠)
     ) {}
 
     /** 리스크 구성 요소 1개: 점수(0~100) + 등급 */
@@ -43,7 +44,8 @@ public class GridRiskDtos {
     /** GET /simulate/grid-risk 응답 전체 */
     public record GridRiskResponse(
             int hour,
-            double globalRisk,
+            double globalRisk,           // 현재 평균 위험지수
+            double globalRiskProjected,  // 참여율 적용 후 평균 (이슈 #19)
             List<GridRiskPoint> grids,
             RiskBreakdown breakdown,
             HourlyRiskCurve hourlyRisk

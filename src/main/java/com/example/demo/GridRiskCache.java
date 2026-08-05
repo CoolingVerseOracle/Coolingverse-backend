@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.example.demo.GridRiskDtos.GridRiskPoint;
 import com.example.demo.db.RiskIndexRepository;
 import com.example.demo.db.RiskIndexRepository.GridRiskRow;
 
@@ -28,8 +27,11 @@ public class GridRiskCache {
     private static final Logger log = LoggerFactory.getLogger(GridRiskCache.class);
     private static final int HOURS = 24;
 
+    /** 캐시가 보관하는 격자 원본 점수 — "적용 후" 값은 요청 시점에 서비스가 계산 */
+    public record BasePoint(double lat, double lng, double score) {}
+
     /** 시간대별 격자 점 목록 [0..23] */
-    private final List<List<GridRiskPoint>> pointsByHour = new ArrayList<>();
+    private final List<List<BasePoint>> pointsByHour = new ArrayList<>();
     /** 시간대별 평균: 위험지수 / 수요 / 공급 / 혼잡 / 환경 */
     private final double[] avgScore = new double[HOURS];
     private final double[] avgDemand = new double[HOURS];
@@ -64,7 +66,7 @@ public class GridRiskCache {
             if (row.getLat() == null || row.getLng() == null) continue;
 
             double score = nz(row.getRiskScore());
-            pointsByHour.get(hour).add(new GridRiskPoint(row.getLat(), row.getLng(), score));
+            pointsByHour.get(hour).add(new BasePoint(row.getLat(), row.getLng(), score));
             sums[hour][0] += score;
             sums[hour][1] += nz(row.getDemand());
             sums[hour][2] += nz(row.getSupply());
@@ -92,7 +94,7 @@ public class GridRiskCache {
         return v == null ? 0 : v;
     }
 
-    public List<GridRiskPoint> pointsAt(int hour) {
+    public List<BasePoint> pointsAt(int hour) {
         return Collections.unmodifiableList(pointsByHour.get(hour));
     }
 
