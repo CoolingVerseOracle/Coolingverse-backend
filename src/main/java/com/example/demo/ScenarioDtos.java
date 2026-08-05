@@ -16,8 +16,9 @@ public class ScenarioDtos {
     public record ScenarioRow(
             String id,
             String name,
-            String region,          // 대상 지역 (예: 성남시 분당구)
-            String conditions,      // 주요 조건 요약 (예: 30%, 08~19시)
+            String region,          // 대상 지역 표시명 (예: 판교테크노밸리)
+            String conditions,      // (과도기 유지) 조건 요약 — 프론트 전환 후 제거 예정 (이슈 #22)
+            int participationRate,  // 참여율 % — conditions 문자열 대체 (이슈 #22 요청 3)
             int supplyDelta,        // 공급 증감(면)
             double riskBefore,
             double riskAfter,

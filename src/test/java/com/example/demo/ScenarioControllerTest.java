@@ -67,6 +67,29 @@ class ScenarioControllerTest {
     }
 
     @Test
+    @DisplayName("이슈 #22: 지역 코드 필터와 participationRate 필드가 동작한다")
+    void filtersByRegionCode() {
+        var pangyo = (ScenarioDetail) controller.create(new CreateScenarioRequest("지역검증 판교", "",
+                new SimulationSettings(true, true, 20, "08:00", "19:00", 500, "pangyo", null))).getBody();
+        var ingye = (ScenarioDetail) controller.create(new CreateScenarioRequest("지역검증 인계", "",
+                new SimulationSettings(true, true, 60, "08:00", "19:00", 500, "ingye", null))).getBody();
+
+        // 코드로 필터
+        var onlyIngye = controller.list("ingye", "지역검증", "all", "all", "updatedDesc", 1, 10);
+        assertEquals(1, onlyIngye.total());
+        assertEquals("지역검증 인계", onlyIngye.items().get(0).name());
+        assertEquals("수원 인계동", onlyIngye.items().get(0).region());
+        assertEquals(60, onlyIngye.items().get(0).participationRate());  // 요청 3
+
+        // 표시명으로도 필터 가능 (구버전 호환)
+        var byName = controller.list("판교테크노밸리", "지역검증", "all", "all", "updatedDesc", 1, 10);
+        assertEquals(1, byName.total());
+
+        controller.delete(Long.parseLong(pangyo.id()));
+        controller.delete(Long.parseLong(ingye.id()));
+    }
+
+    @Test
     @DisplayName("PATCH — 이름·메모 부분 수정, 설정·스냅샷은 불변 (이슈 #14)")
     void patchUpdatesMetadataOnly() {
         var created = (ScenarioDetail) controller.create(new CreateScenarioRequest(

@@ -23,18 +23,33 @@ class SimulationSettingsCompatTest {
     private ObjectMapper objectMapper;   // 스프링이 실제로 쓰는 그 변환기
 
     @Test
-    @DisplayName("region·month 등 미지의 필드가 있어도 SimulationSettings 역직렬화가 성공한다")
-    void ignoresUnknownFields() throws Exception {
+    @DisplayName("이슈 #22: region·month가 정식 필드로 수신된다 (버려지지 않음)")
+    void receivesRegionAndMonth() throws Exception {
         String json = """
                 {"openToPublic":true,"residentsOnly":true,"participationRate":45,
                  "openFrom":"09:00","openTo":"18:00","commercialRadiusM":500,
-                 "region":"pangyo","month":10}
+                 "region":"ingye","month":10}
                 """;
 
         SimulationSettings settings = objectMapper.readValue(json, SimulationSettings.class);
 
         assertTrue(settings.openToPublic());
         assertEquals(45, settings.participationRate());
-        assertEquals("09:00", settings.openFrom());
+        assertEquals("ingye", settings.region());
+        assertEquals(10, settings.month());
+    }
+
+    @Test
+    @DisplayName("구버전 프론트: region·month 없이 보내도 역직렬화 성공 (null 허용)")
+    void toleratesMissingRegionAndMonth() throws Exception {
+        String json = """
+                {"openToPublic":true,"residentsOnly":true,"participationRate":30,
+                 "openFrom":"08:00","openTo":"19:00","commercialRadiusM":500}
+                """;
+
+        SimulationSettings settings = objectMapper.readValue(json, SimulationSettings.class);
+
+        assertEquals(30, settings.participationRate());
+        assertEquals(null, settings.region());   // 저장 시 Regions.fromCode가 판교로 해석
     }
 }

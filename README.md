@@ -123,7 +123,7 @@ DELETE /scenarios/{id}            삭제 (성공 204 / 없으면 404)
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
 | `keyword` | (빈값) | 시나리오 이름 부분 검색 |
-| `region` | `all` | 지역 필터 |
+| `region` | `all` | 지역 필터 — 코드(`pangyo`/`ingye`) 표준, 표시명도 허용 |
 | `sort` | `updatedDesc` | `updatedDesc`(최신순) / `updatedAsc` |
 | `page` | 1 | 1부터 시작 |
 | `pageSize` | 10 | 페이지당 개수 |
