@@ -8,6 +8,7 @@ import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +19,7 @@ import com.example.demo.ScenarioDtos.CreateScenarioRequest;
 import com.example.demo.ScenarioDtos.Paginated;
 import com.example.demo.ScenarioDtos.ScenarioDetail;
 import com.example.demo.ScenarioDtos.ScenarioRow;
+import com.example.demo.ScenarioDtos.UpdateScenarioRequest;
 import com.example.demo.ScenarioStore.ScenarioEntity;
 
 /**
@@ -97,6 +99,28 @@ public class ScenarioController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(toDetail(entity));
+    }
+
+    /**
+     * 메타데이터(이름·메모) 부분 수정.
+     * 보내지 않은 필드는 기존 값 유지. 설정값·결과 스냅샷은 불변이라 재계산이 없다.
+     */
+    @PatchMapping("/scenarios/{id}")
+    public ResponseEntity<?> update(@PathVariable long id,
+                                    @RequestBody(required = false) UpdateScenarioRequest req) {
+        if (req == null || (req.name() == null && req.memo() == null)) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "수정할 항목(name 또는 memo)이 필요합니다."));
+        }
+        if (req.name() != null && req.name().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "시나리오 이름은 비워둘 수 없습니다."));
+        }
+
+        ScenarioEntity updated = store.updateMetadata(id, req.name(), req.memo());
+        return updated == null
+                ? ResponseEntity.notFound().build()
+                : ResponseEntity.ok(toDetail(updated));
     }
 
     @DeleteMapping("/scenarios/{id}")

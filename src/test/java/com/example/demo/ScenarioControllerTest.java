@@ -67,6 +67,45 @@ class ScenarioControllerTest {
     }
 
     @Test
+    @DisplayName("PATCH — 이름·메모 부분 수정, 설정·스냅샷은 불변 (이슈 #14)")
+    void patchUpdatesMetadataOnly() {
+        var created = (ScenarioDetail) controller.create(new CreateScenarioRequest(
+                "원래 이름", "원래 메모", validSettings())).getBody();
+        long id = Long.parseLong(created.id());
+
+        // 이름만 수정 → 메모는 유지
+        var renamed = (ScenarioDetail) controller.update(id,
+                new ScenarioDtos.UpdateScenarioRequest("바뀐 이름", null)).getBody();
+        assertEquals("바뀐 이름", renamed.name());
+        assertEquals("원래 메모", renamed.memo());
+
+        // 메모만 수정 → 이름은 유지
+        var remarked = (ScenarioDetail) controller.update(id,
+                new ScenarioDtos.UpdateScenarioRequest(null, "바뀐 메모")).getBody();
+        assertEquals("바뀐 이름", remarked.name());
+        assertEquals("바뀐 메모", remarked.memo());
+
+        // 설정값·결과 스냅샷은 그대로 (재계산 없음)
+        assertEquals(created.settings().participationRate(), remarked.settings().participationRate());
+        assertEquals(created.addedSupply(), remarked.addedSupply());
+        assertEquals(created.riskAfter(), remarked.riskAfter(), 0.001);
+
+        controller.delete(id);
+    }
+
+    @Test
+    @DisplayName("PATCH — 빈 본문·빈 이름은 400, 없는 id는 404")
+    void patchValidatesInput() {
+        assertEquals(400, controller.update(1L, null).getStatusCode().value());
+        assertEquals(400, controller.update(1L,
+                new ScenarioDtos.UpdateScenarioRequest(null, null)).getStatusCode().value());
+        assertEquals(400, controller.update(1L,
+                new ScenarioDtos.UpdateScenarioRequest("  ", null)).getStatusCode().value());
+        assertEquals(404, controller.update(99_999L,
+                new ScenarioDtos.UpdateScenarioRequest("이름", null)).getStatusCode().value());
+    }
+
+    @Test
     @DisplayName("이름/설정 누락 → 500 대신 400으로 안내")
     void invalidCreateReturns400() {
         assertEquals(400, controller.create(new CreateScenarioRequest(null, null, validSettings()))

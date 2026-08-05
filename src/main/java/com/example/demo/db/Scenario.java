@@ -79,6 +79,16 @@ public class Scenario {
         this.updatedAt = this.createdAt;
     }
 
+    /**
+     * 메타데이터(이름·메모)만 부분 수정. null이면 해당 항목은 건드리지 않는다.
+     * 설정값과 결과 스냅샷은 불변이므로 재계산도 일어나지 않는다.
+     */
+    public void updateMetadata(String newName, String newMemo) {
+        if (newName != null) this.name = newName;
+        if (newMemo != null) this.memo = newMemo;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public Long getScenarioId() { return scenarioId; }
     public String getName() { return name; }
     public String getMemo() { return memo; }
