@@ -1,8 +1,12 @@
 package com.example.demo;
 
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.SimulationDtos.SimulationResult;
@@ -25,9 +29,11 @@ public class SimulationController {
             new SimulationSettings(true, true, 30, "08:00", "19:00", 500);
 
     private final SimulationService simulationService;
+    private final GridRiskService gridRiskService;
 
-    public SimulationController(SimulationService simulationService) {
+    public SimulationController(SimulationService simulationService, GridRiskService gridRiskService) {
         this.simulationService = simulationService;
+        this.gridRiskService = gridRiskService;
     }
 
     @GetMapping("/simulate/initial")
@@ -38,5 +44,23 @@ public class SimulationController {
     @PostMapping("/simulate")
     public SimulationResult simulate(@RequestBody SimulationSettings settings) {
         return simulationService.simulate(settings);
+    }
+
+    /**
+     * 지도 히트맵 데이터 (프론트 PR #22 계약).
+     * - hour: 0~23 (기본 14시)
+     * - region: 현재 pangyo(분당)만 데이터 보유 — 그 외는 404 (프론트가 샘플 폴백 처리)
+     * - participation: 시나리오 참여율(%) — 주면 projected 커브에 감소폭 반영 (계약 확장 제안)
+     */
+    @GetMapping("/simulate/grid-risk")
+    public ResponseEntity<?> gridRisk(
+            @RequestParam(defaultValue = "14") int hour,
+            @RequestParam(defaultValue = "pangyo") String region,
+            @RequestParam(defaultValue = "0") int participation) {
+        if (!region.equals("pangyo")) {
+            return ResponseEntity.status(404)
+                    .body(Map.of("message", "해당 지역 데이터는 아직 준비되지 않았습니다: " + region));
+        }
+        return ResponseEntity.ok(gridRiskService.gridRisk(hour, participation));
     }
 }
