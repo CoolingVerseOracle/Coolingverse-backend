@@ -89,7 +89,26 @@ POST 요청 (프론트 `SimulationSettings` 타입 그대로):
 참여율 10/30/50/70/100% 입력 시 분석 가이드 시나리오 표의 수치
 (추가 공급·CO2·위험지수)가 소수점 둘째 자리까지 일치함을 검증했습니다.
 
-### 3. 시나리오 관리
+### 3. 지도 히트맵
+
+```
+GET /simulate/grid-risk?hour=14&region=pangyo&participation=30
+```
+
+| 파라미터 | 기본값 | 설명 |
+|---|---|---|
+| `hour` | 14 | 조회 시간대 (0~23) |
+| `region` | `pangyo` | 현재 pangyo(분당)만 데이터 보유 — 그 외 지역은 404 |
+| `participation` | 0 | 시나리오 참여율(%) — 주면 `hourlyRisk.projected` 커브에 감소폭 반영 |
+
+응답: 프론트 `geo.ts`의 `GridRiskResponse` 타입 그대로 —
+`grids`(위험지수 보유 격자 1,306개의 좌표+점수), `globalRisk`(해당 시간대 평균),
+`breakdown`(주차/환경/교통 3요소 점수+등급), `hourlyRisk`(24시간 current·projected 커브).
+
+- 기동 시 risk_index 31,344행을 메모리 캐시에 적재해 시간 스크러버 드래그에도 DB 왕복 없음 (응답 약 70KB)
+- breakdown의 "주차"는 수요압력(0.25)·공급부족(0.35)을 가중치 비율로 합산한 값 (4요소→3요소 매핑)
+
+### 4. 시나리오 관리
 
 ```
 GET    /scenarios                 목록 (검색·정렬·페이지네이션)
