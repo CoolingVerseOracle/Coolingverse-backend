@@ -40,25 +40,35 @@ public class GridRiskService {
         int h = Math.floorMod(hour, HOURS);
 
         // 시나리오 적용 감소폭: 검증된 시뮬레이션 수식 재사용 (표준 운영시간 08~19시 기준)
+        // 이슈 #19 초기 버전: 전 격자 동일 감쇠 (격자 특성별 차등은 분석팀 모델 확정 후)
         double delta = 0;
         if (participation > 0) {
             CoreNumbers core = simulationService.core(
                     new SimulationSettings(true, true, participation, "08:00", "19:00", 500));
             delta = core.riskBefore() - core.riskAfter();
         }
+        final double d = delta;
+
+        // 격자별 현재/적용 후 점수
+        List<GridRiskDtos.GridRiskPoint> grids = cache.pointsAt(h).stream()
+                .map(p -> new GridRiskDtos.GridRiskPoint(
+                        p.lat(), p.lng(), p.score(), round1(Math.max(0, p.score() - d))))
+                .toList();
 
         List<Double> current = new ArrayList<>(HOURS);
         List<Double> projected = new ArrayList<>(HOURS);
         for (int i = 0; i < HOURS; i++) {
             double base = round1(cache.avgScoreAt(i));
             current.add(base);
-            projected.add(round1(Math.max(0, base - delta)));
+            projected.add(round1(Math.max(0, base - d)));
         }
 
+        double globalRisk = round1(cache.avgScoreAt(h));
         return new GridRiskResponse(
                 h,
-                round1(cache.avgScoreAt(h)),
-                cache.pointsAt(h),
+                globalRisk,
+                round1(Math.max(0, globalRisk - d)),
+                grids,
                 buildBreakdown(h),
                 new HourlyRiskCurve(current, projected));
     }

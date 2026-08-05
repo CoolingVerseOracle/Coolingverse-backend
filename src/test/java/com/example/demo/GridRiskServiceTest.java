@@ -67,6 +67,24 @@ class GridRiskServiceTest {
     }
 
     @Test
+    @DisplayName("이슈 #19: 격자별 projectedRiskScore와 globalRiskProjected가 감소폭을 반영한다")
+    void providesProjectedPerGrid() {
+        GridRiskResponse res = service.gridRisk(14, 30);   // 30% → 감소폭 0.96
+
+        // 격자별: 30.0 → 29.0, 50.0 → 49.0 (round1)
+        assertEquals(30.0, res.grids().get(0).riskScore(), 0.001);
+        assertEquals(29.0, res.grids().get(0).projectedRiskScore(), 0.001);
+        assertEquals(49.0, res.grids().get(1).projectedRiskScore(), 0.001);
+        // 전체 평균: 40.0 → 39.0
+        assertEquals(39.0, res.globalRiskProjected(), 0.001);
+
+        // 참여율 0이면 현재와 동일
+        GridRiskResponse zero = service.gridRisk(14, 0);
+        assertEquals(zero.globalRisk(), zero.globalRiskProjected(), 0.001);
+        assertEquals(zero.grids().get(0).riskScore(), zero.grids().get(0).projectedRiskScore(), 0.001);
+    }
+
+    @Test
     @DisplayName("breakdown 4→3 매핑: parking은 수요·공급의 가중 평균, 스케일은 0~100")
     void mapsBreakdown() {
         GridRiskResponse res = service.gridRisk(14, 0);

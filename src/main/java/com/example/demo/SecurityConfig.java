@@ -44,8 +44,10 @@ public class SecurityConfig {
             // 세션을 만들지 않는다 — 인증 상태는 오직 토큰으로만 판단
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 접근 규칙: /login 만 공개, 나머지는 전부 인증 필요
+            // /error 는 스프링의 내부 오류 처리 경로 — 막으면 "없는 주소 + 유효 토큰" 요청이
+            // 404 대신 401로 응답돼 프론트의 전역 세션 만료 처리를 오작동시킨다 (이슈 #19)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login").permitAll()
+                .requestMatchers("/login", "/error").permitAll()
                 .anyRequest().authenticated()
             )
             // 인증 없이 접근하면 401 Unauthorized 로 응답 (기본 403 대신 의미에 맞게)
