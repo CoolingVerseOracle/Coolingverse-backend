@@ -34,3 +34,12 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// 운영용 비밀번호의 BCrypt 해시 생성 (배포 준비용): ./gradlew bcrypt -Ppw='새비밀번호'
+tasks.register('bcrypt', JavaExec) {
+	group = 'help'
+	description = '비밀번호를 BCrypt 해시로 변환해 출력'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.example.demo.PasswordHashTool'
+	args project.hasProperty('pw') ? [project.property('pw')] : []
+}
