@@ -71,22 +71,23 @@ class ScenarioControllerTest {
     void filtersByRegionCode() {
         var pangyo = (ScenarioDetail) controller.create(new CreateScenarioRequest("지역검증 판교", "",
                 new SimulationSettings(true, true, 20, "08:00", "19:00", 500, "pangyo", null))).getBody();
-        var ingye = (ScenarioDetail) controller.create(new CreateScenarioRequest("지역검증 인계", "",
-                new SimulationSettings(true, true, 60, "08:00", "19:00", 500, "ingye", null))).getBody();
+        var bucheon = (ScenarioDetail) controller.create(new CreateScenarioRequest("지역검증 부천", "",
+                new SimulationSettings(true, true, 60, "08:00", "19:00", 500, "bucheon", 7))).getBody();
 
         // 코드로 필터
-        var onlyIngye = controller.list("ingye", "지역검증", "all", "all", "updatedDesc", 1, 10);
-        assertEquals(1, onlyIngye.total());
-        assertEquals("지역검증 인계", onlyIngye.items().get(0).name());
-        assertEquals("수원 인계동", onlyIngye.items().get(0).region());
-        assertEquals(60, onlyIngye.items().get(0).participationRate());  // 요청 3
+        var onlyBucheon = controller.list("bucheon", "지역검증", "all", "all", "updatedDesc", 1, 10);
+        assertEquals(1, onlyBucheon.total());
+        assertEquals("지역검증 부천", onlyBucheon.items().get(0).name());
+        assertEquals("부천", onlyBucheon.items().get(0).region());
+        assertEquals("bucheon", onlyBucheon.items().get(0).regionCode());
+        assertEquals(60, onlyBucheon.items().get(0).participationRate());
 
         // 표시명으로도 필터 가능 (구버전 호환)
-        var byName = controller.list("판교테크노밸리", "지역검증", "all", "all", "updatedDesc", 1, 10);
+        var byName = controller.list("판교", "지역검증", "all", "all", "updatedDesc", 1, 10);
         assertEquals(1, byName.total());
 
         controller.delete(Long.parseLong(pangyo.id()));
-        controller.delete(Long.parseLong(ingye.id()));
+        controller.delete(Long.parseLong(bucheon.id()));
     }
 
     @Test

@@ -13,7 +13,8 @@ import jakarta.persistence.UniqueConstraint;
 /** risk_index 테이블 — 격자×시간 위험지수 (1,306 핵심격자 × 24h = 31,344행, 읽기 전용) */
 @Entity
 @Table(name = "risk_index",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"grid_id", "hour_of_day"}))
+       uniqueConstraints = @UniqueConstraint(columnNames = {
+               "pipeline_run_id", "region_code", "grid_id", "analysis_year", "analysis_month", "hour_of_day"}))
 public class RiskIndex {
 
     @Id
@@ -21,8 +22,20 @@ public class RiskIndex {
     @Column(name = "risk_id")
     private Long riskId;
 
+    @Column(name = "pipeline_run_id", nullable = false, length = 80)
+    private String pipelineRunId;
+
+    @Column(name = "region_code", nullable = false, length = 30)
+    private String regionCode;
+
     @Column(name = "grid_id", nullable = false)
     private Long gridId;                 // FK: grids (핵심격자)
+
+    @Column(name = "analysis_year", nullable = false)
+    private Integer analysisYear;
+
+    @Column(name = "analysis_month", nullable = false)
+    private Integer analysisMonth;
 
     @Column(name = "hour_of_day", nullable = false)
     private Integer hourOfDay;           // 0~23
@@ -48,7 +61,11 @@ public class RiskIndex {
     protected RiskIndex() {}
 
     public Long getRiskId() { return riskId; }
+    public String getPipelineRunId() { return pipelineRunId; }
+    public String getRegionCode() { return regionCode; }
     public Long getGridId() { return gridId; }
+    public Integer getAnalysisYear() { return analysisYear; }
+    public Integer getAnalysisMonth() { return analysisMonth; }
     public Integer getHourOfDay() { return hourOfDay; }
     public Double getDemandPressure() { return demandPressure; }
     public Double getSupplyShortage() { return supplyShortage; }

@@ -77,14 +77,14 @@ public class ScenarioStore {
     /** 저장: 조건을 scenarios에 넣고, 결과를 계산해 scenario_results에 스냅샷으로 보관 */
     @Transactional
     public ScenarioEntity save(String name, String memo, SimulationSettings settings) {
-        Regions region = Regions.fromCode(settings.region());  // null/미지 → 판교
+        Regions region = Regions.requireActive(settings.region());
         Scenario entity = scenarios.save(new Scenario(
                 name, memo == null ? "" : memo, region.districtId(),
                 settings.openToPublic() ? "Y" : "N",
                 settings.residentsOnly() ? "Y" : "N",
                 settings.participationRate(),
                 settings.openFrom(), settings.openTo(),
-                settings.commercialRadiusM()));
+                settings.commercialRadiusM(), settings.month()));
 
         ScenarioResult snapshot = upsertTodayResult(entity.getScenarioId(), settings);
         return toView(entity, snapshot);
@@ -156,8 +156,8 @@ public class ScenarioStore {
                 e.getParticipation() == null ? 0 : e.getParticipation(),
                 e.getOperationStart(), e.getOperationEnd(),
                 e.getCommercialRadiusM() == null ? 500 : e.getCommercialRadiusM(),
-                region.code(),   // "열기" 시 프론트가 지역을 복원할 수 있게 코드 반환
-                null);           // month는 저장하지 않음 (계산 미사용 — 이슈 #22 결정)
+                region.code(),
+                e.getAnalysisMonth() == null ? 10 : e.getAnalysisMonth());
         if (r != null) {
             view.addedSupply = r.getAddedSupply() == null ? 0 : r.getAddedSupply();
             view.riskBefore = r.getRiskBefore() == null ? 0 : r.getRiskBefore();

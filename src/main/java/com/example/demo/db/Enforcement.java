@@ -19,6 +19,12 @@ public class Enforcement {
     @Column(name = "enforcement_id")
     private Long enforcementId;
 
+    @Column(name = "pipeline_run_id", length = 80)
+    private String pipelineRunId;
+
+    @Column(name = "region_code", nullable = false, length = 30)
+    private String regionCode;
+
     @Column(name = "grid_id")
     private Long gridId;                 // FK: grids (지오코딩 실패 471건은 NULL)
 
@@ -43,6 +49,8 @@ public class Enforcement {
     protected Enforcement() {}
 
     public Long getEnforcementId() { return enforcementId; }
+    public String getPipelineRunId() { return pipelineRunId; }
+    public String getRegionCode() { return regionCode; }
     public Long getGridId() { return gridId; }
     public String getPlaceText() { return placeText; }
     public Double getLat() { return lat; }
