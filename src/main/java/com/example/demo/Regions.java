@@ -9,7 +9,8 @@ package com.example.demo;
 public enum Regions {
 
     PANGYO("pangyo", 1L, "판교테크노밸리"),
-    INGYE("ingye", 2L, "수원 인계동");
+    INGYE("ingye", 2L, "수원 인계동"),
+    BUCHEON("bucheon", 3L, "부천시");
 
     private final String code;
     private final long districtId;
@@ -24,6 +25,14 @@ public enum Regions {
     public String code() { return code; }
     public long districtId() { return districtId; }
     public String displayName() { return displayName; }
+
+    /** 코드 → 지역 (정확히 일치할 때만). 미지의 코드는 null — grid-risk 404 판정용 */
+    public static Regions find(String code) {
+        for (Regions r : values()) {
+            if (r.code.equals(code)) return r;
+        }
+        return null;
+    }
 
     /** 코드 → 지역. null/미지의 값은 기본 지역(판교) 취급 (이슈 #22 계약) */
     public static Regions fromCode(String code) {
