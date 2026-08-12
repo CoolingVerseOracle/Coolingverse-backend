@@ -49,6 +49,9 @@ public class Scenario {
     @Column(name = "commercial_radius_m")
     private Integer commercialRadiusM;   // 상업시설 반경(m), 기본 500
 
+    @Column(name = "analysis_month", nullable = false)
+    private Integer analysisMonth;
+
     @Column(name = "parking_fee")
     private Integer parkingFee;          // NULL 허용 (프론트 미전송)
 
@@ -65,7 +68,7 @@ public class Scenario {
 
     public Scenario(String name, String memo, Long districtId, String openToPublic,
                     String residentsOnly, Integer participation, String operationStart,
-                    String operationEnd, Integer commercialRadiusM) {
+                    String operationEnd, Integer commercialRadiusM, Integer analysisMonth) {
         this.name = name;
         this.memo = memo;
         this.districtId = districtId;
@@ -75,6 +78,7 @@ public class Scenario {
         this.operationStart = operationStart;
         this.operationEnd = operationEnd;
         this.commercialRadiusM = commercialRadiusM;
+        this.analysisMonth = analysisMonth == null ? 10 : analysisMonth;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
     }
@@ -99,6 +103,7 @@ public class Scenario {
     public String getOperationStart() { return operationStart; }
     public String getOperationEnd() { return operationEnd; }
     public Integer getCommercialRadiusM() { return commercialRadiusM; }
+    public Integer getAnalysisMonth() { return analysisMonth; }
     public Integer getParkingFee() { return parkingFee; }
     public String getCreatedBy() { return createdBy; }
     public LocalDateTime getCreatedAt() { return createdAt; }

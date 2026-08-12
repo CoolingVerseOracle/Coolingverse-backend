@@ -90,8 +90,12 @@ public class ScenarioController {
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "시나리오 이름과 설정값은 필수입니다."));
         }
-        ScenarioEntity saved = store.save(req.name(), req.memo(), req.settings());
-        return ResponseEntity.ok(toDetail(saved));
+        try {
+            ScenarioEntity saved = store.save(req.name(), req.memo(), req.settings());
+            return ResponseEntity.ok(toDetail(saved));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
     }
 
     @GetMapping("/scenarios/{id}")
@@ -183,7 +187,7 @@ public class ScenarioController {
         String conditions = e.settings.participationRate() + "%, "
                 + e.settings.openFrom().substring(0, 2) + "~"
                 + e.settings.openTo().substring(0, 2) + "시";
-        return new ScenarioRow(String.valueOf(e.id), e.name, e.region, conditions,
+        return new ScenarioRow(String.valueOf(e.id), e.name, e.region, e.settings.region(), conditions,
                 e.settings.participationRate(),
                 e.addedSupply, e.riskBefore, e.riskAfter, e.updatedAt.format(DOT_DATE));
     }
