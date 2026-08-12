@@ -49,7 +49,8 @@ public class SimulationController {
     /**
      * 지도 히트맵 데이터 (이슈 #19 계약).
      * - hour: 0~23 (기본 14시)
-     * - region: 현재 pangyo(분당)만 데이터 보유 — 그 외는 404 (프론트가 샘플 폴백 처리)
+     * - region: 위험지수 데이터를 보유한 지역만 응답 — 미지의 코드나 데이터 없는
+     *   지역(ingye 등)은 404 (프론트가 샘플 폴백 처리)
      * - participationRate: 마지막 실행 참여율(%) — 격자별 projectedRiskScore와
      *   projected 커브에 감소폭 반영. (구명칭 participation도 호환 수신)
      */
@@ -59,11 +60,12 @@ public class SimulationController {
             @RequestParam(defaultValue = "pangyo") String region,
             @RequestParam(required = false) Integer participationRate,
             @RequestParam(defaultValue = "0") int participation) {
-        if (!region.equals("pangyo")) {
+        Regions resolved = Regions.find(region);
+        if (resolved == null || !gridRiskService.hasData(resolved)) {
             return ResponseEntity.status(404)
                     .body(Map.of("message", "해당 지역 데이터는 아직 준비되지 않았습니다: " + region));
         }
         int rate = participationRate != null ? participationRate : participation;
-        return ResponseEntity.ok(gridRiskService.gridRisk(hour, rate));
+        return ResponseEntity.ok(gridRiskService.gridRisk(resolved, hour, rate));
     }
 }
