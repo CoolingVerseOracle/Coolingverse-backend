@@ -1,123 +1,127 @@
-# 백엔드 배포 절차 (OCI Compute)
+# 배포 및 CI/CD 절차 (OCI Compute)
 
-백엔드를 OCI Compute 인스턴스에 올리는 전체 절차입니다.
-프론트 정적 파일 서빙은 별도 단계(프론트 배포)에서 다룹니다.
+배포 구조는 한 대의 OCI Compute에서 nginx가 `https://coolingverse.com`의 Vue 정적 파일을 제공하고, `/api` 요청만 Spring Boot로 리버스 프록시하는 방식이다. Cloudflare는 DNS-only, 인증서는 OCI Nginx의 Certbot이 관리한다. `main`에 병합되면 GitHub Actions가 마이그레이션·테스트·빌드·업로드·readiness 검사까지 수행한다.
 
-> 준비물: OCI 콘솔 접근 권한, ADB Wallet 폴더, ADB ADMIN 비밀번호, 운영용 관리자 계정(팀 결정)
+> 준비물: OCI 콘솔 접근 권한, ADB Wallet, ADB ADMIN 비밀번호, 운영 관리자 계정, GitHub Actions용 SSH 키
 
----
+## 자동화 흐름
 
-## 0. 사전 결정 사항
+| 시점 | 백엔드 | 프런트엔드 |
+| --- | --- | --- |
+| `main` 대상 PR | Gradle 테스트·실행 JAR 빌드 | lint·타입 검사·단위 테스트·프로덕션 빌드 |
+| `main` 병합 | Flyway migration → JAR 업로드 → 재시작 → readiness | 정적 파일 업로드 → HTTPS 검증 → 릴리스 전환 |
+| 검증 실패 | 직전 JAR 심볼릭 링크로 되돌리고 재시작 | 직전 정적 릴리스 링크 복구 |
 
-| 항목 | 내용 |
-| --- | --- |
-| 운영 관리자 계정 | 로컬 테스트 계정(coolingverse8) 재사용 금지 — 팀에서 새 ID/비밀번호 결정 |
-| 비밀번호 해시 | `./gradlew bcrypt -Ppw='새비밀번호'` 실행 → 출력된 해시를 사용 (원문은 어디에도 저장 안 함) |
+두 저장소의 배포 작업은 각각 `production` 환경과 동시 실행 방지 규칙을 사용한다. 운영 환경에 승인 규칙을 설정하면 `main` 병합 후에도 승인 전까지 배포는 멈춘다.
 
-## 1. Compute 인스턴스 생성 (OCI 콘솔)
+## 1. OCI Compute 최초 준비
 
-1. 메뉴 → **Compute → Instances → Create instance**
-2. 컴파트먼트: `coolingverse`, 리전: ADB와 동일(South Korea North)
-3. **Image**: Ubuntu 22.04 이상 / **Shape**: `VM.Standard.A1.Flex` (Ampere ARM)
-   - OCPU 2 / 메모리 12GB 권장 — **"Always Free eligible" 라벨 확인 필수** (없으면 과금)
-   - Ampere 용량 부족 오류 시: 시간대 바꿔 재시도, 안 되면 `VM.Standard.E2.1.Micro`(1GB)로 대체
-4. **SSH 키**: "Generate a key pair" → 개인키(.key) 다운로드해 안전한 곳에 보관 (분실 시 접속 불가)
-5. 생성 후 **Public IP 주소**를 기록해 둔다
+OCI 콘솔에서 ADB와 같은 리전의 Ubuntu 24.04 Compute를 생성한다. Security List와 OS 방화벽에서 `80`, `443`을 열고, Spring Boot `8080`은 외부에 열지 않는다. SSH `22`는 팀의 고정 IP만 허용한다.
 
-## 2. 네트워크 방화벽 열기
-
-OCI는 방화벽이 이중이다: ① 콘솔의 Security List ② OS 내부 방화벽. 둘 다 열어야 통한다.
-
-**① 콘솔:** 인스턴스 상세 → Subnet 클릭 → Security List → **Add Ingress Rules**
-- Source `0.0.0.0/0`, 프로토콜 TCP, 포트 `80` (nginx용)
-- 22(SSH)는 기본으로 열려 있음
-
-**② 서버 접속 후 (3단계 이후 실행):**
-```bash
-sudo iptables -I INPUT -p tcp --dport 80 -j ACCEPT
-sudo netfilter-persistent save   # 없으면: sudo apt install -y iptables-persistent
-```
-
-## 3. 서버 접속 (내 PC PowerShell에서)
-
-```powershell
-ssh -i C:\경로\다운받은키.key ubuntu@<Public_IP>
-```
-
-## 4. 서버 기본 설치
+서버에 접속해 런타임과 nginx를 설치한다.
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless nginx
-java -version   # 17 확인
+sudo apt install -y openjdk-17-jre-headless nginx curl certbot python3-certbot-nginx
+sudo install -d -o ubuntu -g ubuntu -m 0755 /home/ubuntu/app/releases
+sudo install -d -o ubuntu -g www-data -m 2775 /var/www/coolingverse/releases
+sudo install -d -o www-data -g www-data -m 0755 /var/www/certbot
 ```
 
-## 5. 파일 업로드 (내 PC PowerShell에서)
+## 2. ADB와 서비스 구성
 
-```powershell
-# 실행 파일 빌드 (레포 폴더에서)
-.\gradlew.bat bootJar
-# 생성 위치: build\libs\parking-auth-0.0.1-SNAPSHOT.jar
-
-# 업로드 (jar 이름은 parking-auth.jar 로 통일)
-scp -i C:\경로\키.key build\libs\parking-auth-0.0.1-SNAPSHOT.jar ubuntu@<IP>:/home/ubuntu/app/parking-auth.jar
-scp -i C:\경로\키.key -r C:\oracle\wallet ubuntu@<IP>:/home/ubuntu/wallet
-scp -i C:\경로\키.key deploy\coolingverse-backend.service deploy\nginx-api.conf ubuntu@<IP>:/home/ubuntu/
-```
-(먼저 서버에서 `mkdir -p /home/ubuntu/app` 실행)
-
-## 6. 환경변수 등록 (서버에서)
+로컬 백엔드 저장소에서 Wallet과 최초 서버 설정 파일을 업로드한다. Wallet의 압축을 서버에서 풀어도 되지만, 저장소·GitHub Actions에는 절대 넣지 않는다.
 
 ```bash
-sudo mkdir -p /etc/coolingverse
-sudo nano /etc/coolingverse/backend.env    # deploy/backend.env.example 내용 참고해 실제 값 기입
+scp -i <SSH_키_경로> -r <Wallet_폴더> ubuntu@<호스트>:/home/ubuntu/wallet
+scp -i <SSH_키_경로> deploy/coolingverse-backend.service deploy/nginx-api.conf \
+  ubuntu@<호스트>:/tmp/
+```
+
+운영 비밀값은 서버에만 만든다.
+
+```bash
+sudo install -d -o root -g root -m 0700 /etc/coolingverse
+sudo nano /etc/coolingverse/backend.env
 sudo chmod 600 /etc/coolingverse/backend.env
 ```
-필수 항목: `ADMIN_ID`, `ADMIN_PASSWORD_HASH`, `ADB_PASSWORD`, `ADB_WALLET_DIR=/home/ubuntu/wallet`
 
-## 7. 서비스 등록 (자동 시작·자동 재시작)
+`backend.env`에는 `deploy/backend.env.example`의 형식대로 `ADMIN_ID`, `ADMIN_PASSWORD_HASH`, `ADB_PASSWORD`, `ADB_WALLET_DIR=/home/ubuntu/wallet`을 넣는다. 운영 관리자 비밀번호 해시는 로컬에서 `./gradlew bcrypt -Ppw='새비밀번호'`로 만든다. 원문 비밀번호, Wallet, `backend.env`는 저장소나 GitHub Actions에 올리지 않는다.
+
+서비스 정의를 등록하고 자동 시작만 활성화한다. 첫 **Backend CD**가 실행 JAR와 심볼릭 링크를 만든 뒤 서비스를 처음 기동하므로, JAR를 수동 업로드할 필요는 없다.
 
 ```bash
-sudo cp /home/ubuntu/coolingverse-backend.service /etc/systemd/system/
+sudo cp /tmp/coolingverse-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now coolingverse-backend
-sudo journalctl -u coolingverse-backend -f    # "Started ParkingAuthApplication" 확인
+sudo systemctl enable coolingverse-backend
 ```
-로그에 `집계: DB 실측값 사용 — 미개방 유휴면 39114...` 가 보이면 ADB 연결 성공.
 
-## 8. nginx 연결
+## 3. Cloudflare DNS와 HTTPS
+
+Cloudflare에 `A @ → 158.180.70.158`, `CNAME www → coolingverse.com`을 등록하고 두 레코드 모두 DNS-only로 둔다. 인증서가 없을 때는 bootstrap 설정을 먼저 설치한다.
 
 ```bash
-sudo cp /home/ubuntu/nginx-api.conf /etc/nginx/sites-available/coolingverse
-sudo ln -s /etc/nginx/sites-available/coolingverse /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default
+sudo cp deploy/nginx-bootstrap.conf /etc/nginx/sites-available/coolingverse
+sudo ln -sfn /etc/nginx/sites-available/coolingverse /etc/nginx/sites-enabled/coolingverse
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot -d coolingverse.com -d www.coolingverse.com
+sudo cp deploy/nginx-api.conf /etc/nginx/sites-available/coolingverse
+sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl enable --now certbot.timer
+sudo certbot renew --dry-run
 ```
 
-## 9. 검증 (내 PC에서)
+프런트 CD를 처음 실행하면 `/var/www/coolingverse/current`가 자동 생성돼 실제 정적 파일을 가리킨다.
 
-```powershell
-# 로그인이 성공하면 배포 완료
-Invoke-RestMethod -Uri "http://<Public_IP>/api/login" -Method Post -ContentType "application/json" -Body '{"username":"운영ID","password":"운영비밀번호"}'
+## 4. GitHub `production` 환경 비밀값
+
+**두 앱 저장소 모두** Settings → Environments → `production`에 SSH 비밀값을 넣고, 백엔드에는 ADB migration 비밀값도 추가한다.
+
+| 이름 | 값 |
+| --- | --- |
+| `DEPLOY_HOST` | OCI Compute 공인 IP 또는 도메인 |
+| `DEPLOY_USER` | 배포 계정 (현재 구성은 `ubuntu`) |
+| `DEPLOY_SSH_PRIVATE_KEY` | GitHub Actions 전용 SSH 개인키 전체 |
+| `DEPLOY_KNOWN_HOSTS` | `ssh-keyscan -H <호스트>`의 결과 |
+| `ADB_USERNAME`, `ADB_PASSWORD` | Flyway 전용 ADB 계정 |
+| `ADB_SERVICE_NAME` | Wallet의 서비스명(예: `cvadb_tp`) |
+| `ADB_WALLET_BASE64` | Wallet zip의 Base64 |
+| `ADMIN_ID` | 운영 관리자 ID(로컬 테스트 기본값 사용 금지) |
+| `ADMIN_PASSWORD_HASH` | 운영 비밀번호의 BCrypt 해시 |
+| `CERTBOT_EMAIL` | Let's Encrypt 만료 알림 이메일 |
+
+SSH 포트가 기본값과 다르면 같은 환경의 Variables에 `DEPLOY_PORT`를 넣는다. 배포 키의 공개키는 서버 배포 계정의 `~/.ssh/authorized_keys`에 추가한다.
+
+배포 계정은 `sudo systemctl restart coolingverse-backend`만 비밀번호 없이 실행할 수 있어야 한다. `/etc/sudoers.d/coolingverse-deploy`에 아래 한 줄을 넣고 `sudo visudo -cf /etc/sudoers.d/coolingverse-deploy`로 검증한다.
+
+```sudoers
+ubuntu ALL=(root) NOPASSWD: /usr/bin/systemctl restart coolingverse-backend
 ```
 
-체크리스트:
-- [ ] `/api/login` 성공 + 토큰 발급
-- [ ] `/api/scenarios` 토큰 없이 401, 토큰으로 5건
-- [ ] `/api/simulate/initial` KPI 5장
-- [ ] 서버 재부팅(`sudo reboot`) 후 자동 기동 확인
+프런트 저장소에는 추가로 Repository variable `NAVER_MAP_CLIENT_ID`를 등록한다. 지도 키는 브라우저 번들에 포함되는 공개 식별자이므로 Secret이 아니라 Variable을 사용한다.
 
-## 10. 재배포 (코드 수정 후)
+## 5. 첫 자동 배포와 확인
 
-```powershell
-.\gradlew.bat bootJar
-scp -i C:\경로\키.key build\libs\parking-auth-0.0.1-SNAPSHOT.jar ubuntu@<IP>:/home/ubuntu/app/parking-auth.jar
-ssh -i C:\경로\키.key ubuntu@<IP> "sudo systemctl restart coolingverse-backend"
+두 저장소의 CI/CD 설정을 `main`에 병합한다. GitHub Actions에서 **Backend CD**를 한 번 실행해 API를 올린 뒤 **Frontend CD**를 실행한다. 이후 `main` 병합마다 자동 배포된다.
+
+```bash
+curl -i -X POST https://coolingverse.com/api/login \
+  -H 'Content-Type: application/json' \
+  --data '{"username":"운영ID","password":"운영비밀번호"}'
 ```
 
-## 주의사항
+다음 항목을 확인한다.
 
-- **ADB 자동 정지**: Always Free ADB는 7일 미사용 시 자동 정지 → 발표 당일 콘솔에서 Available 확인
-- **Wallet·env 파일은 절대 git에 올리지 않는다** (deploy/의 example만 저장소에 존재)
-- 백엔드 재시작 = 로그인 토큰 전체 무효 (재로그인 필요) — 정상 동작
-- 프론트 정적 파일 서빙은 프론트 빌드 완성 후 nginx-api.conf에 블록 추가 (별도 단계)
+- `/api/login`에서 토큰이 발급된다.
+- 토큰 없이 `/api/scenarios`는 `401`, 토큰을 포함하면 시나리오 목록이 반환된다.
+- 대시보드에서 초기 KPI와 지도 데이터가 정상 표시된다.
+- 서버 재부팅 뒤 `coolingverse-backend`가 자동 기동된다.
+- `https://www.coolingverse.com`은 `https://coolingverse.com`으로 이동한다.
+- `systemctl list-timers certbot.timer`와 `certbot renew --dry-run`이 성공한다.
+
+## 운영 주의사항
+
+- Always Free ADB는 7일 동안 사용하지 않으면 자동 정지될 수 있으므로 시연 전 Available 상태를 확인한다.
+- 백엔드 재시작 시 메모리 토큰은 모두 무효화된다. 이는 현재 인증 설계의 정상 동작이다.
+- 네이버 지도 콘솔 서비스 URL에 `https://coolingverse.com`을 등록한다.
