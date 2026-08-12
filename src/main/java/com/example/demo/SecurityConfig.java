@@ -47,7 +47,7 @@ public class SecurityConfig {
             // /error 는 스프링의 내부 오류 처리 경로 — 막으면 "없는 주소 + 유효 토큰" 요청이
             // 404 대신 401로 응답돼 프론트의 전역 세션 만료 처리를 오작동시킨다 (이슈 #19)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/error").permitAll()
+                .requestMatchers("/login", "/error", "/actuator/health", "/actuator/health/**").permitAll()
                 .anyRequest().authenticated()
             )
             // 인증 없이 접근하면 401 Unauthorized 로 응답 (기본 403 대신 의미에 맞게)
@@ -68,7 +68,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOrigins(List.of("http://localhost:5173", "https://coolingverse.com"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
 

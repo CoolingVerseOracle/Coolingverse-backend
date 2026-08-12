@@ -1,0 +1,97 @@
+name: Configure OCI Nginx and TLS
+
+on:
+  workflow_dispatch:
+    inputs:
+      certbot_email:
+        description: Let's Encrypt 만료 알림 이메일(CERTBOT_EMAIL secret이 있으면 생략)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coolingverse-backend-production
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL || inputs.certbot_email }}
+      CONFIG_ID: ${{ github.sha }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate configuration input
+        run: |
+          set -euo pipefail
+          test -n "$CERTBOT_EMAIL"
+          test -f deploy/nginx-bootstrap.conf
+          test -f deploy/nginx-api.conf
+          test -f deploy/coolingverse-backend.service
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload Nginx and systemd definitions
+        run: |
+          set -euo pipefail
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -P "$DEPLOY_PORT" -i "$HOME/.ssh/id_ed25519" \
+            deploy/nginx-bootstrap.conf deploy/nginx-api.conf deploy/coolingverse-backend.service \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/"
+
+      - name: Install Nginx, issue certificate, and activate HTTPS
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -p "$DEPLOY_PORT" -i "$HOME/.ssh/id_ed25519" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "CERTBOT_EMAIL=${CERTBOT_EMAIL} bash -se" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nginx certbot
+          sudo install -d -o www-data -g www-data -m 0755 /var/www/certbot
+          sudo install -d -o ubuntu -g www-data -m 2775 /var/www/coolingverse/releases
+          sudo install -d -o ubuntu -g ubuntu -m 0755 /home/ubuntu/app/releases
+
+          sudo install -m 0644 /tmp/coolingverse-backend.service /etc/systemd/system/coolingverse-backend.service
+          sudo systemctl daemon-reload
+          sudo systemctl enable coolingverse-backend
+
+          sudo install -m 0644 /tmp/nginx-bootstrap.conf /etc/nginx/sites-available/coolingverse
+          sudo ln -sfn /etc/nginx/sites-available/coolingverse /etc/nginx/sites-enabled/coolingverse
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          if ! sudo test -f /etc/letsencrypt/live/coolingverse.com/fullchain.pem; then
+            sudo certbot certonly --webroot -w /var/www/certbot \
+              --non-interactive --agree-tos --email "$CERTBOT_EMAIL" \
+              --cert-name coolingverse.com -d coolingverse.com -d www.coolingverse.com
+          fi
+
+          sudo install -m 0644 /tmp/nginx-api.conf /etc/nginx/sites-available/coolingverse
+          sudo nginx -t
+          sudo systemctl reload nginx
+          sudo systemctl enable --now certbot.timer
+
+          # 프런트 릴리스 전에는 루트가 404일 수 있으므로 TLS 연결 자체만 검증한다.
+          curl --silent --show-error --max-time 10 \
+            --resolve coolingverse.com:443:127.0.0.1 https://coolingverse.com/ >/dev/null
+          REMOTE_SCRIPT
