@@ -14,7 +14,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    name: Validate production deployment configuration
+    if: github.event_name == 'workflow_dispatch' || vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate required secrets and variables
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
+          ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
+        run: |
+          set -euo pipefail
+
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PRIVATE_KEY DEPLOY_KNOWN_HOSTS ADMIN_ID ADMIN_PASSWORD_HASH; do
+            test -n "${!name}" || { echo "Missing production value: $name" >&2; exit 1; }
+          done
+
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+          [[ "$ADMIN_ID" =~ ^[A-Za-z0-9._@-]+$ ]]
+          [[ "$ADMIN_PASSWORD_HASH" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]
+
   migrate:
+    needs: preflight
     uses: ./.github/workflows/migrate.yml
     secrets: inherit
 
@@ -67,13 +94,35 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
 
-      - name: Upload executable JAR
+      - name: Prepare administrator environment file
+        env:
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
+          ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
         run: |
           set -euo pipefail
+          [[ "$ADMIN_ID" =~ ^[A-Za-z0-9._@-]+$ ]]
+          [[ "$ADMIN_PASSWORD_HASH" =~ ^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$ ]]
+
+          umask 077
+          printf 'ADMIN_ID=%s\nADMIN_PASSWORD_HASH=%s\n' \
+            "$ADMIN_ID" "$ADMIN_PASSWORD_HASH" \
+            > "$RUNNER_TEMP/admin.env"
+
+      - name: Upload executable JAR and administrator environment
+        run: |
+          set -euo pipefail
+          admin_env="$RUNNER_TEMP/admin.env"
+          trap 'rm -f "$admin_env"' EXIT
+
           scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -P "$DEPLOY_PORT" -i "$HOME/.ssh/id_ed25519" \
             "${{ steps.jar.outputs.path }}" \
             "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/coolingverse-backend-${RELEASE_ID}.jar"
+
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -P "$DEPLOY_PORT" -i "$HOME/.ssh/id_ed25519" \
+            "$admin_env" \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/coolingverse-admin-${RELEASE_ID}.env"
 
       - name: Activate release and verify health
         run: |
@@ -91,10 +140,30 @@ jobs:
           release_jar="$release_dir/parking-auth.jar"
           live_jar="$app_root/parking-auth.jar"
           previous_jar="$(readlink -f "$live_jar" 2>/dev/null || true)"
+          admin_archive="/tmp/coolingverse-admin-${RELEASE_ID}.env"
+          admin_dir=/etc/coolingverse
+          admin_pending="$admin_dir/admin.env.${RELEASE_ID}"
+          admin_target="$admin_dir/admin.env"
+
+          cleanup() {
+            rm -f "$archive" "$admin_archive"
+            sudo rm -f "$admin_pending" || true
+          }
+          trap cleanup EXIT
 
           test -d "$releases_dir"
           test -f "$archive"
+          test -f "$admin_archive"
           test ! -e "$release_dir"
+          sudo grep -Fqx 'EnvironmentFile=/etc/coolingverse/admin.env' \
+            /etc/systemd/system/coolingverse-backend.service
+
+          sudo install -d -o root -g root -m 0755 "$admin_dir"
+          sudo install -o root -g root -m 0600 "$admin_archive" "$admin_pending"
+          sudo mv -f "$admin_pending" "$admin_target"
+          rm -f "$admin_archive"
+          test "$(sudo stat -c '%U:%G %a' "$admin_target")" = 'root:root 600'
+
           mkdir "$release_dir"
           install -m 0644 "$archive" "$release_jar"
           ln -sfn "$release_jar" "$live_jar"

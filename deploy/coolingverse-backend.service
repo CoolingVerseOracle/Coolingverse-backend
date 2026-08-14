@@ -15,6 +15,7 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/app
 # 환경변수는 파일로 주입 (backend.env.example 참고)
 EnvironmentFile=/etc/coolingverse/backend.env
+EnvironmentFile=/etc/coolingverse/admin.env
 ExecStart=/usr/bin/java -jar /home/ubuntu/app/parking-auth.jar --spring.profiles.active=oracle
 # 앱이 죽으면 5초 후 자동 재시작
 Restart=on-failure
