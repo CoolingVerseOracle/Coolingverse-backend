@@ -27,7 +27,8 @@ import com.example.demo.SimulationDtos.SimulationSettings;
 @Service
 public class SimulationService {
 
-    // ── 집계값: DB 실측(oracle) 또는 검증된 기본값(로컬 H2) — StatsConfig가 결정 ──
+    // ── 집계값: 운영은 RegionalStatsService가 지역·월별 활성 데이터로 조회,
+    //    아래 상수는 SupplyStats 직접 주입(테스트·검증된 기본값) 경로에서만 쓰인다 ──
     private final int IDLE_UNOPENED_TOTAL;  // 미개방 단지 잠재 유휴면 합 = 100% 시 추가 공급
     private final int IDLE_OPENED_TOTAL;    // 기개방 단지 유휴면 합 = 기본 공급
     private final int TOTAL_PARKING;        // 전체 주차면 합 (공급률 분모)

@@ -19,7 +19,7 @@ public class Enforcement {
     @Column(name = "enforcement_id")
     private Long enforcementId;
 
-    @Column(name = "pipeline_run_id", length = 80)
+    @Column(name = "pipeline_run_id", nullable = false, length = 80)
     private String pipelineRunId;
 
     @Column(name = "region_code", nullable = false, length = 30)

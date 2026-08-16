@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -105,6 +106,15 @@ class GridRiskServiceTest {
     void clampsHour() {
         assertEquals(23, service.gridRisk(-1, 0).hour());
         assertEquals(1, service.gridRisk(25, 0).hour());
+    }
+
+    @Test
+    @DisplayName("활성 데이터가 없는 지역·월은 빈 200 응답 대신 IllegalArgumentException(→400)")
+    void rejectsMissingDataset() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.gridRisk("pangyo", 2025, 3, 14, 0));   // 3월 데이터 미적재
+        assertThrows(IllegalArgumentException.class,
+                () -> service.gridRisk("bucheon", 2024, 10, 14, 0)); // 다른 연도
     }
 
     @Test

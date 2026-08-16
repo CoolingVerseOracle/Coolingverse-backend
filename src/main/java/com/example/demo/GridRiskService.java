@@ -37,6 +37,11 @@ public class GridRiskService {
     }
 
     public GridRiskResponse gridRisk(String region, int year, int month, int hour, int participation) {
+        // 데이터 미적재 상태를 grids=[] · risk=0.0 인 200 응답으로 감추지 않는다
+        if (!cache.hasData(region, year, month)) {
+            throw new IllegalArgumentException(
+                    "해당 지역·월의 활성 위험지수 데이터가 없습니다: region=" + region + ", year=" + year + ", month=" + month);
+        }
         int h = Math.floorMod(hour, HOURS);
 
         // 시나리오 적용 감소폭: 검증된 시뮬레이션 수식 재사용 (표준 운영시간 08~19시 기준)

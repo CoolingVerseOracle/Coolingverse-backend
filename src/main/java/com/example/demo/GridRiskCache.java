@@ -88,6 +88,11 @@ public class GridRiskCache {
     private double nz(Double value) { return value == null ? 0 : value; }
     private double round2(double value) { return Math.round(value * 100) / 100.0; }
 
+    /** 해당 지역·연도·월의 활성 데이터가 적재돼 있는지 (없으면 API가 400으로 실패해야 한다) */
+    public boolean hasData(String region, int year, int month) {
+        return datasets.containsKey(new DatasetKey(region, year, month));
+    }
+
     public List<BasePoint> pointsAt(String region, int year, int month, int hour) {
         return Collections.unmodifiableList(dataset(region, year, month).points.get(hour));
     }
