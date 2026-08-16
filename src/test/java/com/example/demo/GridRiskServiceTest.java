@@ -118,6 +118,17 @@ class GridRiskServiceTest {
     }
 
     @Test
+    @DisplayName("신규 지역(산본·일산)은 활성 카탈로그에 있어야 API가 열리고, 데이터 미적재면 400")
+    void newRegionsRegisteredButRequireData() {
+        assertEquals("sanbon", Regions.requireActive("sanbon").code());
+        assertEquals("ilsan", Regions.requireActive("ilsan").code());
+        assertThrows(IllegalArgumentException.class, () -> Regions.requireActive("ingye"));
+        // 캐시에 데이터가 없으면 400 — 카탈로그 등록만으로 빈 응답이 나가지 않는다
+        assertThrows(IllegalArgumentException.class,
+                () -> service.gridRisk("sanbon", 2025, 10, 14, 0));
+    }
+
+    @Test
     @DisplayName("같은 grid_id·월·시간이어도 판교와 부천 캐시는 서로 섞이지 않는다")
     void isolatesRegions() {
         GridRiskResponse pangyo = service.gridRisk("pangyo", 2025, 10, 14, 0);
