@@ -32,7 +32,7 @@ jobs:
           install -d -m 700 "$RUNNER_TEMP/adb-wallet"
           printf '%s' '${{ secrets.ADB_WALLET_BASE64 }}' | base64 --decode > "$RUNNER_TEMP/wallet.zip"
           unzip -q "$RUNNER_TEMP/wallet.zip" -d "$RUNNER_TEMP/adb-wallet"
-      - name: Validate and migrate before application deployment
+      - name: Migrate database schema before application deployment
         env:
           WALLET_DIR: ${{ runner.temp }}/adb-wallet
         run: |
@@ -41,4 +41,15 @@ jobs:
             -url="jdbc:oracle:thin:@${ADB_SERVICE_NAME}?TNS_ADMIN=${WALLET_DIR}" \
             -user="$ADB_USERNAME" -password="$ADB_PASSWORD" \
             -locations="filesystem:src/main/resources/db/migration" \
-            -baselineOnMigrate=true -baselineVersion=1 validate migrate
+            -baselineOnMigrate=true -baselineVersion=1 migrate
+
+      - name: Validate applied migrations
+        env:
+          WALLET_DIR: ${{ runner.temp }}/adb-wallet
+        run: |
+          set -euo pipefail
+          flyway \
+            -url="jdbc:oracle:thin:@${ADB_SERVICE_NAME}?TNS_ADMIN=${WALLET_DIR}" \
+            -user="$ADB_USERNAME" -password="$ADB_PASSWORD" \
+            -locations="filesystem:src/main/resources/db/migration" \
+            validate
