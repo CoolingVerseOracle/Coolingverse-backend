@@ -65,12 +65,31 @@ public class SimulationService {
     }
 
     /**
-     * 위험지수 감소폭 앵커 (분석 가이드 시나리오 표).
+     * 위험지수 감소폭 앵커 — 참여율 0/10/30/50/70/100% 지점의 감소폭(점).
      * 참여율이 앵커 사이 값이면 직선으로 잇는 선형 보간을 쓴다.
-     * (개방 효과는 수확 체감이라 직선 하나로는 못 그리고, 구간별 직선으로 근사)
+     *
+     * 값의 출처(이슈 #30, 분석팀 승인 2026-08-16): 지역 risk_index·apartments로
+     * "미개방 유휴면 × 참여율"만큼 격자 공급을 늘려 supply_shortage를 고정 스케일로
+     * 재계산했을 때의 평균 감소폭. 100% 최대 감소폭에 참여율을 선형 곱한다.
+     * 초기 뼈대 모델 표(10%→0.36 … 100%→1.68)는 유휴면 선반영 전 값이라 폐기했다.
+     * 산출 스크립트: Sanbon/pipeline/derive_anchors_all.py (region_anchors.json).
      */
     private static final double[] ANCHOR_RATE  = {0, 10, 30, 50, 70, 100};
-    private static final double[] ANCHOR_DELTA = {0, 0.36, 0.96, 1.31, 1.52, 1.68};
+    /** 기준지역(판교) 앵커 — 테스트·검증 기본값 경로에서 사용 */
+    private static final double[] ANCHOR_DELTA = {0, 0.09, 0.27, 0.45, 0.64, 0.91};
+
+    /** 지역별 감소폭 앵커. 등록되지 않은 지역은 정책 효과 시뮬레이션 대신 400. */
+    private static final java.util.Map<String, double[]> REGION_ANCHOR_DELTA = java.util.Map.of(
+            "pangyo",  ANCHOR_DELTA,                                   // baseline 53.79, 최대 -0.91
+            "bucheon", new double[]{0, 0.04, 0.11, 0.19, 0.26, 0.38},  // baseline 49.77, 최대 -0.38
+            "sanbon",  new double[]{0, 0.05, 0.16, 0.26, 0.36, 0.52},  // baseline 51.47, 최대 -0.52
+            "ilsan",   new double[]{0, 0.18, 0.54, 0.90, 1.26, 1.80}   // baseline 48.14, 최대 -1.80
+    );
+
+    /** 해당 지역에 정책 효과 시뮬레이션이 가능한지 (앵커 표 보유 여부) */
+    public static boolean supportsSimulation(String regionCode) {
+        return REGION_ANCHOR_DELTA.containsKey(regionCode == null ? "pangyo" : regionCode);
+    }
 
     /** 핵심 계산 결과 묶음 — 시뮬레이션 응답과 시나리오 저장 스냅샷이 공유한다 */
     public record CoreNumbers(int addedSupply, int totalSupply, double co2Kg,
@@ -80,6 +99,7 @@ public class SimulationService {
     public CoreNumbers core(SimulationSettings s) {
         SupplyStats stats = statsFor(s);
         int p = clamp(s.participationRate(), 0, 100);
+        double[] anchors = anchorsFor(s);
 
         // 1) 추가 공급: 미개방 단지 유휴면 × 참여율 (입주민 전용을 포함해야 발생)
         int added = s.residentsOnly() ? (int) Math.floor(stats.idleUnopened() * p / 100.0) : 0;
@@ -95,8 +115,8 @@ public class SimulationService {
         // 3) 일일 CO2 저감량(kg) = 추가 개방 면수 × 0.306 × (운영시간 / 10)
         double co2Kg = round2(added * CO2_PER_SPACE_KG * (hours / 10.0));
 
-        // 4) 위험지수: baseline − 감소폭(앵커 보간). 추가 개방이 없으면 감소도 없음
-        double delta = s.residentsOnly() ? interpolateDelta(p) : 0;
+        // 4) 위험지수: baseline − 감소폭(지역 앵커 보간). 추가 개방이 없으면 감소도 없음
+        double delta = s.residentsOnly() ? interpolateDelta(p, anchors) : 0;
         double riskAfter = round2(stats.riskBaseline() - delta);
 
         // 위험지수 감소율(%) — 근사 지표들의 재료
@@ -120,7 +140,7 @@ public class SimulationService {
                 buildMetricChanges(c.riskBefore(), c.riskAfter(), c.deltaPct(), supplyRateBefore, supplyRateAfter),
                 buildParticipation(p, stats),
                 buildHourlySupply(s, c.totalSupply()),
-                buildRiskTrend(c.riskBefore()));
+                buildRiskTrend(c.riskBefore(), anchorsFor(s)));
     }
 
     // ── 응답 조립 ─────────────────────────────────────────────────────
@@ -182,14 +202,14 @@ public class SimulationService {
     }
 
     /** 위험지수 추이: 개방률 단계별 현재(고정) vs 예측(감소) — 분석 가이드 표 그대로 */
-    private RiskTrend buildRiskTrend(double riskBaseline) {
+    private RiskTrend buildRiskTrend(double riskBaseline, double[] deltas) {
         List<String> labels = new ArrayList<>();
         List<Double> current = new ArrayList<>();
         List<Double> projected = new ArrayList<>();
         for (int i = 0; i < ANCHOR_RATE.length; i++) {
             labels.add((int) ANCHOR_RATE[i] + "%");
             current.add(riskBaseline);
-            projected.add(round2(riskBaseline - ANCHOR_DELTA[i]));
+            projected.add(round2(riskBaseline - deltas[i]));
         }
         return new RiskTrend(labels, current, projected);
     }
@@ -197,15 +217,30 @@ public class SimulationService {
     // ── 계산 도우미 ───────────────────────────────────────────────────
 
     /** 앵커 사이를 직선으로 잇는 선형 보간 */
-    private double interpolateDelta(int rate) {
+    private double interpolateDelta(int rate, double[] deltas) {
         for (int i = 1; i < ANCHOR_RATE.length; i++) {
             if (rate <= ANCHOR_RATE[i]) {
                 double span = ANCHOR_RATE[i] - ANCHOR_RATE[i - 1];
                 double t = (rate - ANCHOR_RATE[i - 1]) / span;
-                return ANCHOR_DELTA[i - 1] + t * (ANCHOR_DELTA[i] - ANCHOR_DELTA[i - 1]);
+                return deltas[i - 1] + t * (deltas[i] - deltas[i - 1]);
             }
         }
-        return ANCHOR_DELTA[ANCHOR_DELTA.length - 1];
+        return deltas[deltas.length - 1];
+    }
+
+    /**
+     * 요청 지역의 앵커 표. 테스트 경로(regionalStats == null)는 분당 표.
+     * 앵커가 없는 지역은 400 — 근거 없는 감소폭을 내보내지 않는다.
+     */
+    private double[] anchorsFor(SimulationSettings s) {
+        if (regionalStats == null) return ANCHOR_DELTA;
+        String code = Regions.requireActive(s.region()).code();
+        double[] deltas = REGION_ANCHOR_DELTA.get(code);
+        if (deltas == null) {
+            throw new IllegalArgumentException(
+                    "해당 지역은 정책 효과 시뮬레이션을 아직 지원하지 않습니다(현재 상태 진단만 제공): " + code);
+        }
+        return deltas;
     }
 
     private SupplyStats statsFor(SimulationSettings settings) {

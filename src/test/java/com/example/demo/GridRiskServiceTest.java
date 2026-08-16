@@ -59,27 +59,27 @@ class GridRiskServiceTest {
     }
 
     @Test
-    @DisplayName("participation을 주면 projected 커브가 검증된 감소폭만큼 내려간다 (30% = -0.96)")
+    @DisplayName("participation을 주면 projected 커브가 검증된 감소폭만큼 내려간다 (30% = -0.27)")
     void appliesScenarioDelta() {
         GridRiskResponse res = service.gridRisk(14, 30);
 
-        // current 40.0 → projected 39.04 ≈ 39.0 (소수 1자리 반올림)
+        // current 40.0 → projected 39.73 ≈ 39.7 (소수 1자리 반올림)
         assertEquals(40.0, res.hourlyRisk().current().get(0), 0.001);
-        assertEquals(39.0, res.hourlyRisk().projected().get(0), 0.001);
+        assertEquals(39.7, res.hourlyRisk().projected().get(0), 0.001);
         assertTrue(res.hourlyRisk().projected().get(14) < res.hourlyRisk().current().get(14));
     }
 
     @Test
     @DisplayName("이슈 #19: 격자별 projectedRiskScore와 globalRiskProjected가 감소폭을 반영한다")
     void providesProjectedPerGrid() {
-        GridRiskResponse res = service.gridRisk(14, 30);   // 30% → 감소폭 0.96
+        GridRiskResponse res = service.gridRisk(14, 30);   // 30% → 감소폭 0.27
 
-        // 격자별: 30.0 → 29.0, 50.0 → 49.0 (round1)
+        // 격자별: 30.0 → 29.7, 50.0 → 49.7 (round1)
         assertEquals(30.0, res.grids().get(0).riskScore(), 0.001);
-        assertEquals(29.0, res.grids().get(0).projectedRiskScore(), 0.001);
-        assertEquals(49.0, res.grids().get(1).projectedRiskScore(), 0.001);
-        // 전체 평균: 40.0 → 39.0
-        assertEquals(39.0, res.globalRiskProjected(), 0.001);
+        assertEquals(29.7, res.grids().get(0).projectedRiskScore(), 0.001);
+        assertEquals(49.7, res.grids().get(1).projectedRiskScore(), 0.001);
+        // 전체 평균: 40.0 → 39.7
+        assertEquals(39.7, res.globalRiskProjected(), 0.001);
 
         // 참여율 0이면 현재와 동일
         GridRiskResponse zero = service.gridRisk(14, 0);
