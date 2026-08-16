@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import com.example.demo.SimulationDtos.BeforeAfterMetric;
 import com.example.demo.SimulationDtos.ChartPoint;
@@ -26,17 +27,20 @@ import com.example.demo.SimulationDtos.SimulationSettings;
 @Service
 public class SimulationService {
 
-    // ── 집계값: DB 실측(oracle) 또는 검증된 기본값(로컬 H2) — StatsConfig가 결정 ──
+    // ── 집계값: 운영은 RegionalStatsService가 지역·월별 활성 데이터로 조회,
+    //    아래 상수는 SupplyStats 직접 주입(테스트·검증된 기본값) 경로에서만 쓰인다 ──
     private final int IDLE_UNOPENED_TOTAL;  // 미개방 단지 잠재 유휴면 합 = 100% 시 추가 공급
     private final int IDLE_OPENED_TOTAL;    // 기개방 단지 유휴면 합 = 기본 공급
     private final int TOTAL_PARKING;        // 전체 주차면 합 (공급률 분모)
     private final int APT_OPENED, APT_UNOPENED, APT_TOTAL;  // 단지 수
     private final double RISK_BASELINE;     // 위험지수 baseline (24시간 전체 평균)
+    private final RegionalStatsService regionalStats;
 
     /** 주차면 1면 개방 시 일일 CO2 저감 계수(kg) — 배회 1.5km + 공회전 4분 (분석 확정 상수) */
     private static final double CO2_PER_SPACE_KG = 0.306;
 
     public SimulationService(SupplyStats stats) {
+        this.regionalStats = null;
         this.IDLE_UNOPENED_TOTAL = stats.idleUnopened();
         this.IDLE_OPENED_TOTAL = stats.idleOpened();
         this.TOTAL_PARKING = stats.totalParking();
@@ -44,6 +48,20 @@ public class SimulationService {
         this.APT_UNOPENED = stats.aptUnopened();
         this.APT_TOTAL = stats.aptOpened() + stats.aptUnopened();
         this.RISK_BASELINE = stats.riskBaseline();
+    }
+
+    /** 운영에서는 지역·월별 활성 데이터 집계를 사용한다. */
+    @Autowired
+    public SimulationService(RegionalStatsService regionalStats) {
+        this.regionalStats = regionalStats;
+        SupplyStats defaults = SupplyStats.VERIFIED_DEFAULTS;
+        this.IDLE_UNOPENED_TOTAL = defaults.idleUnopened();
+        this.IDLE_OPENED_TOTAL = defaults.idleOpened();
+        this.TOTAL_PARKING = defaults.totalParking();
+        this.APT_OPENED = defaults.aptOpened();
+        this.APT_UNOPENED = defaults.aptUnopened();
+        this.APT_TOTAL = defaults.aptOpened() + defaults.aptUnopened();
+        this.RISK_BASELINE = defaults.riskBaseline();
     }
 
     /**
@@ -60,12 +78,13 @@ public class SimulationService {
 
     /** 핵심 수식 계산 (공급·CO2·위험지수) — 시나리오 저장 시에도 이 메서드를 쓴다 */
     public CoreNumbers core(SimulationSettings s) {
+        SupplyStats stats = statsFor(s);
         int p = clamp(s.participationRate(), 0, 100);
 
         // 1) 추가 공급: 미개방 단지 유휴면 × 참여율 (입주민 전용을 포함해야 발생)
-        int added = s.residentsOnly() ? (int) Math.floor(IDLE_UNOPENED_TOTAL * p / 100.0) : 0;
+        int added = s.residentsOnly() ? (int) Math.floor(stats.idleUnopened() * p / 100.0) : 0;
         // 기본 공급: 이미 외부인에게 개방된 단지의 유휴면 (외부인 개방 포함 시)
-        int base = s.openToPublic() ? IDLE_OPENED_TOTAL : 0;
+        int base = s.openToPublic() ? stats.idleOpened() : 0;
         int totalSupply = base + added;
 
         // 2) 운영시간: 시작·종료 시각 블록을 모두 세는 방식 (08:00~19:00 = 12시간)
@@ -78,34 +97,35 @@ public class SimulationService {
 
         // 4) 위험지수: baseline − 감소폭(앵커 보간). 추가 개방이 없으면 감소도 없음
         double delta = s.residentsOnly() ? interpolateDelta(p) : 0;
-        double riskAfter = round2(RISK_BASELINE - delta);
+        double riskAfter = round2(stats.riskBaseline() - delta);
 
         // 위험지수 감소율(%) — 근사 지표들의 재료
-        double deltaPct = round1(100.0 * delta / RISK_BASELINE);
+        double deltaPct = round1(100.0 * delta / stats.riskBaseline());
 
-        return new CoreNumbers(added, totalSupply, co2Kg, RISK_BASELINE, riskAfter, deltaPct);
+        return new CoreNumbers(added, totalSupply, co2Kg, stats.riskBaseline(), riskAfter, deltaPct);
     }
 
     /** 시뮬레이션 실행 — 프론트 SimulationResult 모양으로 반환 */
     public SimulationResult simulate(SimulationSettings s) {
+        SupplyStats stats = statsFor(s);
         int p = clamp(s.participationRate(), 0, 100);
         CoreNumbers c = core(s);
 
         // 공급률(%): 개방 유휴면 / 전체 주차면
-        double supplyRateBefore = round1(100.0 * (s.openToPublic() ? IDLE_OPENED_TOTAL : 0) / TOTAL_PARKING);
-        double supplyRateAfter = round1(100.0 * c.totalSupply() / TOTAL_PARKING);
+        double supplyRateBefore = round1(100.0 * (s.openToPublic() ? stats.idleOpened() : 0) / stats.totalParking());
+        double supplyRateAfter = round1(100.0 * c.totalSupply() / stats.totalParking());
 
         return new SimulationResult(
-                buildKpis(c.totalSupply(), c.addedSupply(), c.co2Kg(), c.riskAfter(), c.deltaPct()),
-                buildMetricChanges(c.riskAfter(), c.deltaPct(), supplyRateBefore, supplyRateAfter),
-                buildParticipation(p),
+                buildKpis(c.totalSupply(), c.addedSupply(), c.co2Kg(), c.riskBefore(), c.riskAfter(), c.deltaPct()),
+                buildMetricChanges(c.riskBefore(), c.riskAfter(), c.deltaPct(), supplyRateBefore, supplyRateAfter),
+                buildParticipation(p, stats),
                 buildHourlySupply(s, c.totalSupply()),
-                buildRiskTrend());
+                buildRiskTrend(c.riskBefore()));
     }
 
     // ── 응답 조립 ─────────────────────────────────────────────────────
 
-    private List<KpiMetric> buildKpis(int totalSupply, int added, double co2Kg,
+    private List<KpiMetric> buildKpis(int totalSupply, int added, double co2Kg, double riskBaseline,
                                       double riskAfter, double deltaPct) {
         // ⚠️ illegalParking/congestion 은 아직 전용 산식이 없어 위험지수 감소율로 근사.
         //    DB 연동 후 격자별 단속·혼잡 데이터로 정밀화 예정 (TODO)
@@ -119,14 +139,14 @@ public class SimulationService {
                 new KpiMetric("carbon", "탄소배출 저감 예측", co2Kg, "kg/일",
                         null, co2Kg > 0 ? "우수" : "변화 없음", "positive"),
                 new KpiMetric("risk", "도시 교통·환경 위험지수", riskAfter, "",
-                        RISK_BASELINE, "위험도 감소", "negative"));
+                        riskBaseline, "위험도 감소", "negative"));
     }
 
-    private List<BeforeAfterMetric> buildMetricChanges(double riskAfter, double deltaPct,
+    private List<BeforeAfterMetric> buildMetricChanges(double riskBaseline, double riskAfter, double deltaPct,
                                                        double supplyRateBefore, double supplyRateAfter) {
         double supplyRateGain = round1(supplyRateAfter - supplyRateBefore);
         return List.of(
-                new BeforeAfterMetric("risk", "위험지수", RISK_BASELINE, riskAfter,
+                new BeforeAfterMetric("risk", "위험지수", riskBaseline, riskAfter,
                         "-" + deltaPct + "%", "negative"),
                 new BeforeAfterMetric("illegal", "불법주정차 건수", 100, round1(100 - deltaPct),
                         "-" + deltaPct + "%", "warning"),
@@ -135,10 +155,11 @@ public class SimulationService {
     }
 
     /** 도넛: 210개 단지를 [기개방 / 참여 예정 / 미참여] 로 나눈 비율(%) */
-    private ParticipationBreakdown buildParticipation(int p) {
-        int joining = (int) Math.floor(APT_UNOPENED * p / 100.0); // 참여 예정 단지 수
-        double opened = round1(100.0 * APT_OPENED / APT_TOTAL);
-        double planned = round1(100.0 * joining / APT_TOTAL);
+    private ParticipationBreakdown buildParticipation(int p, SupplyStats stats) {
+        int apartmentTotal = Math.max(stats.aptOpened() + stats.aptUnopened(), 1);
+        int joining = (int) Math.floor(stats.aptUnopened() * p / 100.0); // 참여 예정 단지 수
+        double opened = round1(100.0 * stats.aptOpened() / apartmentTotal);
+        double planned = round1(100.0 * joining / apartmentTotal);
         double none = round1(100 - opened - planned);
         return new ParticipationBreakdown(p, List.of(
                 new ParticipationBreakdown.Segment("개방", opened),
@@ -161,14 +182,14 @@ public class SimulationService {
     }
 
     /** 위험지수 추이: 개방률 단계별 현재(고정) vs 예측(감소) — 분석 가이드 표 그대로 */
-    private RiskTrend buildRiskTrend() {
+    private RiskTrend buildRiskTrend(double riskBaseline) {
         List<String> labels = new ArrayList<>();
         List<Double> current = new ArrayList<>();
         List<Double> projected = new ArrayList<>();
         for (int i = 0; i < ANCHOR_RATE.length; i++) {
             labels.add((int) ANCHOR_RATE[i] + "%");
-            current.add(RISK_BASELINE);
-            projected.add(round2(RISK_BASELINE - ANCHOR_DELTA[i]));
+            current.add(riskBaseline);
+            projected.add(round2(riskBaseline - ANCHOR_DELTA[i]));
         }
         return new RiskTrend(labels, current, projected);
     }
@@ -185,6 +206,17 @@ public class SimulationService {
             }
         }
         return ANCHOR_DELTA[ANCHOR_DELTA.length - 1];
+    }
+
+    private SupplyStats statsFor(SimulationSettings settings) {
+        if (regionalStats == null) {
+            return new SupplyStats(IDLE_UNOPENED_TOTAL, IDLE_OPENED_TOTAL, TOTAL_PARKING,
+                    APT_OPENED, APT_UNOPENED, RISK_BASELINE);
+        }
+        Regions region = Regions.requireActive(settings.region());
+        int month = settings.month() == null ? 10 : settings.month();
+        if (month < 1 || month > 12) throw new IllegalArgumentException("월은 1~12 범위여야 합니다.");
+        return regionalStats.get(region.code(), GridRiskCache.DEFAULT_YEAR, month);
     }
 
     /** "HH:mm" → 하루 중 분(minute) 위치. 형식이 이상하면 0 취급 */

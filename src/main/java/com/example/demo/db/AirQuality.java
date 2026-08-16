@@ -19,6 +19,12 @@ public class AirQuality {
     @Column(name = "air_id")
     private Long airId;
 
+    @Column(name = "pipeline_run_id", nullable = false, length = 80)
+    private String pipelineRunId;
+
+    @Column(name = "region_code", nullable = false, length = 30)
+    private String regionCode;
+
     @Column(name = "grid_id")
     private Long gridId;                 // FK: grids
 
@@ -52,6 +58,8 @@ public class AirQuality {
     protected AirQuality() {}
 
     public Long getAirId() { return airId; }
+    public String getPipelineRunId() { return pipelineRunId; }
+    public String getRegionCode() { return regionCode; }
     public Long getGridId() { return gridId; }
     public String getStationName() { return stationName; }
     public Double getLat() { return lat; }

@@ -81,19 +81,19 @@ class ScenarioStoreTest {
     }
 
     @Test
-    @DisplayName("이슈 #22: 지역이 저장·복원된다 (ingye → 표시명 '수원 인계동', 코드 복원)")
+    @DisplayName("활성 지역과 월이 저장·복원된다")
     void persistsRegion() {
-        ScenarioEntity saved = store.save("인계동 시나리오", "",
-                new SimulationSettings(true, true, 30, "08:00", "19:00", 500, "ingye", 7));
+        ScenarioEntity saved = store.save("부천 시나리오", "",
+                new SimulationSettings(true, true, 30, "08:00", "19:00", 500, "bucheon", 7));
 
-        assertEquals("수원 인계동", saved.region);            // 표시명 = 분석 지역명 기준
-        assertEquals("ingye", saved.settings.region());       // "열기" 복원용 코드
-        assertEquals(null, saved.settings.month());           // month는 저장하지 않음 (팀 결정)
+        assertEquals("부천", saved.region);
+        assertEquals("bucheon", saved.settings.region());
+        assertEquals(7, saved.settings.month());
 
         // 지역 미지정(구버전)은 판교로
         ScenarioEntity legacy = store.save("지역없음", "",
                 new SimulationSettings(true, true, 10, "08:00", "19:00", 500));
-        assertEquals("판교테크노밸리", legacy.region);
+        assertEquals("판교", legacy.region);
 
         store.deleteById(saved.id);
         store.deleteById(legacy.id);

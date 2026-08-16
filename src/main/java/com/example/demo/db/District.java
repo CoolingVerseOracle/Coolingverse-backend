@@ -17,6 +17,15 @@ public class District {
     @Column(name = "district_id")
     private Long districtId;
 
+    @Column(name = "region_code", nullable = false, length = 30, unique = true)
+    private String regionCode;
+
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    @Column(name = "is_active", nullable = false, length = 1)
+    private String isActive;
+
     @Column(name = "name", nullable = false, length = 100)
     private String name;                 // 지역명 (예: 성남시 분당구)
 
@@ -41,6 +50,9 @@ public class District {
     protected District() {}              // JPA 기본 생성자
 
     public Long getDistrictId() { return districtId; }
+    public String getRegionCode() { return regionCode; }
+    public String getDisplayName() { return displayName; }
+    public String getIsActive() { return isActive; }
     public String getName() { return name; }
     public String getSido() { return sido; }
     public String getSigungu() { return sigungu; }

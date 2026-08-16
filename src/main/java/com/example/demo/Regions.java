@@ -8,31 +8,26 @@ package com.example.demo;
  */
 public enum Regions {
 
-    PANGYO("pangyo", 1L, "판교테크노밸리"),
-    INGYE("ingye", 2L, "수원 인계동"),
-    BUCHEON("bucheon", 3L, "부천시");
+    PANGYO("pangyo", 1L, "판교", true),
+    INGYE("ingye", 2L, "수원 인계동", false),
+    BUCHEON("bucheon", 3L, "부천", true);
 
     private final String code;
     private final long districtId;
     private final String displayName;
+    private final boolean active;
 
-    Regions(String code, long districtId, String displayName) {
+    Regions(String code, long districtId, String displayName, boolean active) {
         this.code = code;
         this.districtId = districtId;
         this.displayName = displayName;
+        this.active = active;
     }
 
     public String code() { return code; }
     public long districtId() { return districtId; }
     public String displayName() { return displayName; }
-
-    /** 코드 → 지역 (정확히 일치할 때만). 미지의 코드는 null — grid-risk 404 판정용 */
-    public static Regions find(String code) {
-        for (Regions r : values()) {
-            if (r.code.equals(code)) return r;
-        }
-        return null;
-    }
+    public boolean active() { return active; }
 
     /** 코드 → 지역. null/미지의 값은 기본 지역(판교) 취급 (이슈 #22 계약) */
     public static Regions fromCode(String code) {
@@ -40,6 +35,15 @@ public enum Regions {
             if (r.code.equals(code)) return r;
         }
         return PANGYO;
+    }
+
+    /** API 실행용 엄격한 지역 해석. 알 수 없거나 비활성인 지역은 거부한다. */
+    public static Regions requireActive(String code) {
+        String normalized = (code == null || code.isBlank()) ? PANGYO.code : code;
+        for (Regions region : values()) {
+            if (region.code.equals(normalized) && region.active) return region;
+        }
+        throw new IllegalArgumentException("알 수 없거나 비활성인 지역입니다: " + normalized);
     }
 
     /** districts FK → 지역. 미지의 번호는 판교 취급 (기존 시드 호환) */

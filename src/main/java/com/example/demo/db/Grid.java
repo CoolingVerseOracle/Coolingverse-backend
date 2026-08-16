@@ -6,16 +6,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 /** grids 테이블 — 100m 격자 마스터 (분당구 122,318행, 읽기 전용) */
 @Entity
-@Table(name = "grids")
+@Table(name = "grids", uniqueConstraints = @UniqueConstraint(columnNames = {"region_code", "grid_id"}))
 public class Grid {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "grid_id")
     private Long gridId;
+
+    @Column(name = "region_code", nullable = false, length = 30)
+    private String regionCode;
 
     @Column(name = "district_id", nullable = false)
     private Long districtId;             // FK: districts
@@ -50,6 +54,7 @@ public class Grid {
     protected Grid() {}
 
     public Long getGridId() { return gridId; }
+    public String getRegionCode() { return regionCode; }
     public Long getDistrictId() { return districtId; }
     public String getGridCode() { return gridCode; }
     public Double getMinLat() { return minLat; }

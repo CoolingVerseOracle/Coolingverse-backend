@@ -21,6 +21,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	// 로컬 개발용 임시 DB (메모리). ADB 연결 전까지 엔티티 검증용
 	runtimeOnly 'com.h2database:h2'
 	// Oracle ADB 접속 드라이버 + Wallet(mTLS) 인증 라이브러리 (oracle 프로필에서 사용)

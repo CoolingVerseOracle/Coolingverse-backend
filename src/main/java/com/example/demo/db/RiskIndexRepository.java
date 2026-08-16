@@ -4,28 +4,16 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-/** risk_index 조회 창구 — 지도 히트맵과 baseline 계산에 사용 */
+/** 활성 데이터 버전의 지역·연도·월별 위험지수만 조회한다. */
 public interface RiskIndexRepository extends JpaRepository<RiskIndex, Long> {
 
-    /** 특정 시간대의 격자별 위험지수 (히트맵 한 장면) */
-    List<RiskIndex> findByHourOfDay(Integer hourOfDay);
-
-    /**
-     * 기준지역(분당, district 1) 평균 위험지수 — 시뮬레이션 baseline.
-     * 비교지역(부천 등) 위험지수가 같은 테이블에 있어도 baseline이 오염되지 않도록
-     * 분당 격자 소속 행만 집계한다.
-     */
-    @Query("""
-            select avg(r.riskScore) from RiskIndex r
-            where r.gridId in (select g.gridId from Grid g where g.districtId = 1)
-            """)
-    Double averageRiskScore();
-
-    /** 지도 캐시 적재용 한 행: 격자 좌표·소속 지역 + 시간대 + 지수·구성요소 */
     interface GridRiskRow {
         Long getGridId();
-        Long getDistrictId();
+        String getRegionCode();
+        Integer getAnalysisYear();
+        Integer getAnalysisMonth();
         Integer getHourOfDay();
         Double getLat();
         Double getLng();
@@ -36,19 +24,36 @@ public interface RiskIndexRepository extends JpaRepository<RiskIndex, Long> {
         Double getEnv();
     }
 
-    /**
-     * 히트맵 재료 전체를 격자 좌표·소속 지역과 함께 조회.
-     * 기동 시 1회만 실행해 지역별 메모리 캐시에 담는다 (GridRiskCache).
-     */
-    @Query("""
-            select r.gridId as gridId, g.districtId as districtId,
-                   r.hourOfDay as hourOfDay,
-                   g.centerLat as lat, g.centerLng as lng,
-                   r.riskScore as riskScore,
-                   r.demandPressure as demand, r.supplyShortage as supply,
-                   r.trafficCongest as traffic, r.envSensitivity as env
-            from RiskIndex r, Grid g
-            where g.gridId = r.gridId
-            """)
-    List<GridRiskRow> findAllWithCoordinates();
+    @Query(value = """
+            SELECT r.grid_id AS gridId, r.region_code AS regionCode,
+                   r.analysis_year AS analysisYear, r.analysis_month AS analysisMonth,
+                   r.hour_of_day AS hourOfDay, g.center_lat AS lat, g.center_lng AS lng,
+                   r.risk_score AS riskScore, r.demand_pressure AS demand,
+                   r.supply_shortage AS supply, r.traffic_congest AS traffic,
+                   r.env_sensitivity AS env
+              FROM risk_index r
+              JOIN active_dataset_versions a
+                ON a.region_code = r.region_code
+               AND a.analysis_year = r.analysis_year
+               AND a.active_run_id = r.pipeline_run_id
+              JOIN grids g
+                ON g.region_code = r.region_code AND g.grid_id = r.grid_id
+             ORDER BY r.region_code, r.analysis_year, r.analysis_month, r.hour_of_day, r.grid_id
+            """, nativeQuery = true)
+    List<GridRiskRow> findAllActiveWithCoordinates();
+
+    @Query(value = """
+            SELECT AVG(r.risk_score)
+              FROM risk_index r
+              JOIN active_dataset_versions a
+                ON a.region_code = r.region_code
+               AND a.analysis_year = r.analysis_year
+               AND a.active_run_id = r.pipeline_run_id
+             WHERE r.region_code = :regionCode
+               AND r.analysis_year = :analysisYear
+               AND r.analysis_month = :analysisMonth
+            """, nativeQuery = true)
+    Double averageActiveRisk(@Param("regionCode") String regionCode,
+                             @Param("analysisYear") int analysisYear,
+                             @Param("analysisMonth") int analysisMonth);
 }

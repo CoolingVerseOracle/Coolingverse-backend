@@ -9,12 +9,15 @@
 -- =====================================================
 
 -- 0. DISTRICTS — CSV가 없어서 수동 INSERT (grids의 district_id=1이 참조)
-INSERT INTO districts (district_id, name, sido, sigungu, center_lat, center_lng, is_base)
-VALUES (1, '성남시 분당구', '경기도', '성남시 분당구', 37.3595, 127.1052, 'Y');
+INSERT INTO districts (district_id, region_code, display_name, is_active, name, sido, sigungu, center_lat, center_lng, is_base)
+VALUES (1, 'pangyo', '판교', 'Y', '성남시 분당구', '경기도', '성남시 분당구', 37.3595, 127.1052, 'Y');
 
 -- 비교 지역: 수원 인계동 (이슈 #22 — 시나리오 지역 저장용. 격자·지수 데이터는 분석팀 확보 대기)
-INSERT INTO districts (district_id, name, sido, sigungu, center_lat, center_lng, is_base)
-VALUES (2, '수원 인계동', '경기도', '수원시 팔달구', 37.2635, 127.0302, 'N');
+INSERT INTO districts (district_id, region_code, display_name, is_active, name, sido, sigungu, center_lat, center_lng, is_base)
+VALUES (2, 'ingye', '수원 인계동', 'N', '수원 인계동', '경기도', '수원시 팔달구', 37.2635, 127.0302, 'N');
+
+INSERT INTO districts (district_id, region_code, display_name, is_active, name, sido, sigungu, center_lat, center_lng, is_base)
+VALUES (3, 'bucheon', '부천', 'Y', '부천시', '경기도', '부천시', 37.5034, 126.7660, 'N');
 
 -- 1. SCENARIOS — 대표 개방률 5단계 (초기 화면용)
 INSERT INTO scenarios (scenario_id, name, memo, district_id, open_to_public, residents_only, participation, operation_start, operation_end, commercial_radius_m, parking_fee, created_by, created_at)
