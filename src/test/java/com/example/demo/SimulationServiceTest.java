@@ -30,14 +30,14 @@ class SimulationServiceTest {
 
     @ParameterizedTest(name = "참여율 {0}% → 공급 {1}면, CO2 {2}kg, 위험지수 {3}")
     @CsvSource({
-            //  참여율, 추가공급,   CO2(kg),   위험지수(후)  — 분석 가이드 표 그대로
-            "  10,    3911,   1436.12,  37.45",
-            "  30,   11734,   4308.72,  36.85",
-            "  50,   19557,   7181.33,  36.50",
-            "  70,   27379,  10053.57,  36.29",
-            " 100,   39114,  14362.66,  36.13",
+            //  참여율, 추가공급,   CO2(kg),   위험지수(후)  — 공급·CO2는 분석 가이드 표, 위험지수는 재보정 모델 앵커(#30)
+            "  10,    3911,   1436.12,  53.70",
+            "  30,   11734,   4308.72,  53.52",
+            "  50,   19557,   7181.33,  53.34",
+            "  70,   27379,  10053.57,  53.15",
+            " 100,   39114,  14362.66,  52.88",
     })
-    @DisplayName("분석 가이드 시나리오 표 5단계 재현")
+    @DisplayName("시나리오 표 5단계 재현 (baseline 53.79, 앵커 0.09/0.27/0.45/0.64/0.91)")
     void reproducesAnalysisGuideTable(int rate, int expectedSupply,
                                       double expectedCo2, double expectedRisk) {
         CoreNumbers core = service.core(settings(rate));
@@ -45,7 +45,7 @@ class SimulationServiceTest {
         assertEquals(expectedSupply, core.addedSupply());
         assertEquals(expectedCo2, core.co2Kg(), 0.001);
         assertEquals(expectedRisk, core.riskAfter(), 0.001);
-        assertEquals(37.81, core.riskBefore(), 0.001);
+        assertEquals(53.79, core.riskBefore(), 0.001);
     }
 
     @Test
@@ -55,16 +55,16 @@ class SimulationServiceTest {
 
         assertEquals(0, core.addedSupply());
         assertEquals(0.0, core.co2Kg(), 0.001);
-        assertEquals(37.81, core.riskAfter(), 0.001);
+        assertEquals(53.79, core.riskAfter(), 0.001);
     }
 
     @Test
-    @DisplayName("앵커 사이 값(45%)은 선형 보간: 30%(0.96)과 50%(1.31) 사이")
+    @DisplayName("앵커 사이 값(45%)은 선형 보간: 30%(0.27)과 50%(0.45) 사이")
     void interpolatesBetweenAnchors() {
         CoreNumbers core = service.core(settings(45));
 
-        // 45%는 30~50 구간의 75% 지점: 0.96 + 0.75×(1.31-0.96) = 1.2225 → 37.81-1.2225 = 36.59
-        assertEquals(36.59, core.riskAfter(), 0.001);
+        // 45%는 30~50 구간의 75% 지점: 0.27 + 0.75×(0.45-0.27) = 0.405 → 53.79-0.405 = 53.385 → 53.39
+        assertEquals(53.39, core.riskAfter(), 0.001);
         // 공급은 정비례: floor(39114 × 0.45) = 17601
         assertEquals(17601, core.addedSupply());
     }
@@ -77,7 +77,7 @@ class SimulationServiceTest {
 
         assertEquals(0, core.addedSupply());
         assertEquals(0.0, core.co2Kg(), 0.001);
-        assertEquals(37.81, core.riskAfter(), 0.001);
+        assertEquals(53.79, core.riskAfter(), 0.001);
         // 기개방 단지 공급(3,684면)은 그대로 포함
         assertEquals(3684, core.totalSupply());
     }

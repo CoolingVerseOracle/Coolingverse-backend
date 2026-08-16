@@ -36,15 +36,15 @@ class ScenarioStoreTest {
     }
 
     @Test
-    @DisplayName("시드 스냅샷이 분석 가이드 표와 일치 (30% = 공급 11,734 / 위험 36.85 / CO2 4,308.72)")
+    @DisplayName("시드 스냅샷이 분석 가이드 표와 일치 (30% = 공급 11,734 / 위험 53.52 / CO2 4,308.72)")
     void seedSnapshotsMatchAnalysisGuide() {
         ScenarioEntity standard = store.findAll().stream()
                 .filter(e -> e.name.contains("표준"))
                 .findFirst().orElseThrow();
 
         assertEquals(11734, standard.addedSupply);
-        assertEquals(37.81, standard.riskBefore, 0.001);
-        assertEquals(36.85, standard.riskAfter, 0.001);
+        assertEquals(53.79, standard.riskBefore, 0.001);
+        assertEquals(53.52, standard.riskAfter, 0.001);
         assertEquals(4308.72, standard.carbonReduction, 0.001);
     }
 
@@ -58,7 +58,7 @@ class ScenarioStoreTest {
         ScenarioEntity saved = store.save("테스트", "메모", settings);
 
         assertEquals(17601, saved.addedSupply);          // floor(39114 × 0.45)
-        assertEquals(36.59, saved.riskAfter, 0.001);     // 선형 보간
+        assertEquals(53.39, saved.riskAfter, 0.001);     // 선형 보간
         assertEquals(5385.91, saved.carbonReduction, 0.001); // 10시간 블록
         assertEquals(before + 1, store.findAll().size());
 

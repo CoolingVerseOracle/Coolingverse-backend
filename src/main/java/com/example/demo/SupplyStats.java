@@ -18,5 +18,5 @@ public record SupplyStats(
 
     /** CSV 실측으로 검증된 기본값 — DB 없이 돌 때 사용 */
     public static final SupplyStats VERIFIED_DEFAULTS =
-            new SupplyStats(39_114, 3_684, 147_580, 17, 193, 37.81);
+            new SupplyStats(39_114, 3_684, 147_580, 17, 193, 53.79);
 }
