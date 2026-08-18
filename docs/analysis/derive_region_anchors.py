@@ -41,7 +41,7 @@ def max_delta_fixed(risk, apt):
 
 B = r'C:\Users\skw01\Documents\parking-erd'
 S = r'C:\git_torii\Coolingverse-backend'
-P = r'C:\git_torii\data\Anyang Pyeongchon\build_output'
+P = r'C:\git_torii\data\Anyang Pyeongchon\build_output_v3'
 regions = {
     'pangyo': (rf'{B}\bundang_final\adb-upload\risk_index_v2.csv', rf'{B}\adb-upload\apartments.csv'),
     'bucheon': (rf'{B}\bucheon\bucheon_risk_index_final.csv', rf'{B}\bucheon\bucheon_apartments_erd.csv'),
