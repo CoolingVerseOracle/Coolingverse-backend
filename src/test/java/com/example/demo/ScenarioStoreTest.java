@@ -90,10 +90,10 @@ class ScenarioStoreTest {
         assertEquals("bucheon", saved.settings.region());
         assertEquals(7, saved.settings.month());
 
-        // 지역 미지정(구버전)은 판교로
+        // 지역 미지정(구버전)은 판교(성남 분당)로
         ScenarioEntity legacy = store.save("지역없음", "",
                 new SimulationSettings(true, true, 10, "08:00", "19:00", 500));
-        assertEquals("판교", legacy.region);
+        assertEquals("성남 분당", legacy.region);
 
         store.deleteById(saved.id);
         store.deleteById(legacy.id);
