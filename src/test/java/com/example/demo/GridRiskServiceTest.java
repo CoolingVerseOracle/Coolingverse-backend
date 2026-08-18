@@ -122,10 +122,13 @@ class GridRiskServiceTest {
     void newRegionsRegisteredButRequireData() {
         assertEquals("sanbon", Regions.requireActive("sanbon").code());
         assertEquals("ilsan", Regions.requireActive("ilsan").code());
+        assertEquals("pyeongchon", Regions.requireActive("pyeongchon").code());
         assertThrows(IllegalArgumentException.class, () -> Regions.requireActive("ingye"));
         // 캐시에 데이터가 없으면 400 — 카탈로그 등록만으로 빈 응답이 나가지 않는다
         assertThrows(IllegalArgumentException.class,
                 () -> service.gridRisk("sanbon", 2025, 10, 14, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.gridRisk("pyeongchon", 2025, 10, 14, 0));
     }
 
     @Test
