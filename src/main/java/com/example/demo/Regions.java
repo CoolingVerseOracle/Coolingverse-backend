@@ -12,7 +12,8 @@ public enum Regions {
     INGYE("ingye", 2L, "수원 인계동", false),
     BUCHEON("bucheon", 3L, "부천", true),
     SANBON("sanbon", 4L, "군포 산본", true),
-    ILSAN("ilsan", 5L, "고양 일산", true);
+    ILSAN("ilsan", 5L, "고양 일산", true),
+    PYEONGCHON("pyeongchon", 6L, "안양 평촌", true);
 
     private final String code;
     private final long districtId;
