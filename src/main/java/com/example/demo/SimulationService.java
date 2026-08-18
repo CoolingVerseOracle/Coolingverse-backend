@@ -83,7 +83,8 @@ public class SimulationService {
             "pangyo",  ANCHOR_DELTA,                                   // baseline 53.79, 최대 -0.91
             "bucheon", new double[]{0, 0.04, 0.11, 0.19, 0.26, 0.38},  // baseline 49.77, 최대 -0.38
             "sanbon",  new double[]{0, 0.05, 0.16, 0.26, 0.36, 0.52},  // baseline 51.47, 최대 -0.52
-            "ilsan",   new double[]{0, 0.18, 0.54, 0.90, 1.26, 1.80}   // baseline 48.14, 최대 -1.80
+            "ilsan",   new double[]{0, 0.18, 0.54, 0.90, 1.26, 1.80},  // baseline 48.14, 최대 -1.80
+            "pyeongchon", new double[]{0, 0.06, 0.18, 0.29, 0.41, 0.59} // baseline 51.10, 최대 -0.59
     );
 
     /** 해당 지역에 정책 효과 시뮬레이션이 가능한지 (앵커 표 보유 여부) */
