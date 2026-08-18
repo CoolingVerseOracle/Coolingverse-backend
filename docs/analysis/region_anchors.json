@@ -52,16 +52,17 @@
     "supply_repro_err": 0.000797
   },
   "pyeongchon": {
-    "baseline": 51.1,
-    "max_delta": 0.5868,
+    "baseline": 51.05,
+    "max_delta": 1.5643,
     "deltas": [
-      0.06,
-      0.18,
-      0.29,
-      0.41,
-      0.59
+      0.16,
+      0.47,
+      0.78,
+      1.09,
+      1.56
     ],
     "idle_unopened": 28879,
-    "supply_repro_err": 0.0
+    "supply_repro_err": 0.0,
+    "dataset": "v3-20260818 (활동 격자 329개 — 단속 50건 미만 격자 제외)"
   }
 }
