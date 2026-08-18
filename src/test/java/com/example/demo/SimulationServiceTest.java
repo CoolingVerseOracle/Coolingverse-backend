@@ -119,6 +119,20 @@ class SimulationServiceTest {
         assertEquals(max.riskAfter(), over.riskAfter(), 0.001);
     }
 
+    /**
+     * 지역을 Regions에 활성으로 등록만 하고 앵커 표를 빠뜨리면, 지도·초기 조회는 정상인데
+     * 시뮬레이션 실행만 400으로 막힌다(평촌 등록 시 실제로 발생). 등록 누락을 여기서 잡는다.
+     */
+    @Test
+    @DisplayName("활성 지역은 모두 위험지수 감소폭 앵커를 갖는다")
+    void everyActiveRegionHasAnchors() {
+        for (Regions region : Regions.values()) {
+            if (!region.active()) continue;
+            assertTrue(SimulationService.supportsSimulation(region.code()),
+                    "앵커 표가 없는 활성 지역: " + region.code());
+        }
+    }
+
     @Test
     @DisplayName("응답 조립: KPI 5장, 도넛 3조각, 시간대 점 12개(08~19시)")
     void buildsFullResultShape() {
