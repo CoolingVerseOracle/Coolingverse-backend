@@ -13,7 +13,8 @@ RATES = [10, 30, 50, 70, 100]
 def load(p):
     for enc in ['utf-8-sig', 'cp949', 'utf-8']:
         try:
-            return pd.read_csv(p, encoding=enc)
+            # 평촌부터는 데이터 파이프라인 계약 CSV(grid_code)라 기존 컬럼명으로 맞춘다
+            return pd.read_csv(p, encoding=enc).rename(columns={'grid_code': 'grid_id'})
         except Exception:
             pass
 
@@ -40,11 +41,14 @@ def max_delta_fixed(risk, apt):
 
 B = r'C:\Users\skw01\Documents\parking-erd'
 S = r'C:\git_torii\Coolingverse-backend'
+P = r'C:\git_torii\data\Anyang Pyeongchon\build_output'
 regions = {
     'pangyo': (rf'{B}\bundang_final\adb-upload\risk_index_v2.csv', rf'{B}\adb-upload\apartments.csv'),
     'bucheon': (rf'{B}\bucheon\bucheon_risk_index_final.csv', rf'{B}\bucheon\bucheon_apartments_erd.csv'),
     'sanbon': (rf'{S}\Sanbon\pipeline\sanbon_risk_index_final.csv', rf'{S}\Sanbon\pipeline\sanbon_apartments_erd.csv'),
     'ilsan': (rf'{S}\ilsan\ilsan_risk_index.csv', rf'{S}\ilsan\goyang_ilsan_apartments_erd.csv'),
+    # 평촌은 Coolingverse-data 파이프라인 build_output(계약 CSV)을 그대로 쓴다
+    'pyeongchon': (rf'{P}\risk_index.csv', rf'{P}\apartments.csv'),
 }
 
 result = {}

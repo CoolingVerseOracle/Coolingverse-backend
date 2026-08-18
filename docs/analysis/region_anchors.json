@@ -50,5 +50,18 @@
     ],
     "idle_unopened": 60485,
     "supply_repro_err": 0.000797
+  },
+  "pyeongchon": {
+    "baseline": 51.1,
+    "max_delta": 0.5868,
+    "deltas": [
+      0.06,
+      0.18,
+      0.29,
+      0.41,
+      0.59
+    ],
+    "idle_unopened": 28879,
+    "supply_repro_err": 0.0
   }
 }
