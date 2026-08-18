@@ -83,7 +83,7 @@ class ScenarioControllerTest {
         assertEquals(60, onlyBucheon.items().get(0).participationRate());
 
         // 표시명으로도 필터 가능 (구버전 호환)
-        var byName = controller.list("판교", "지역검증", "all", "all", "updatedDesc", 1, 10);
+        var byName = controller.list("성남 분당", "지역검증", "all", "all", "updatedDesc", 1, 10);
         assertEquals(1, byName.total());
 
         controller.delete(Long.parseLong(pangyo.id()));
